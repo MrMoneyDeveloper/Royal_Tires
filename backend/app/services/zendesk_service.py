@@ -30,19 +30,20 @@ TRIGGER_STATUS_EMAIL_NAME = "Royal Tyres | Notify Demo Receiver - Status Update"
 TRIGGER_STATUS_SYNC_NAME = "Royal Tyres | Sync Status to Asset Portal"
 EMAIL_TARGET_SUBJECT = "[Royal Tyres IT] Asset request update"
 
-# Zendesk calls a single-select dropdown a `tagger` in the Ticket Fields API.
+# Zendesk option tags are account-wide; a project prefix avoids collisions with
+# unrelated fields (the sandbox already uses `other` for its Query Types field).
 FIELD_DEFINITIONS = {
     "asset_type_field": {
         "title": "RT | Asset Type",
         "type": "tagger",
         "custom_field_options": [
-            {"name": "Laptop", "value": "laptop"},
-            {"name": "Monitor", "value": "monitor"},
-            {"name": "Mouse", "value": "mouse"},
-            {"name": "Keyboard", "value": "keyboard"},
-            {"name": "Headset", "value": "headset"},
-            {"name": "Docking Station", "value": "docking_station"},
-            {"name": "Other", "value": "other"},
+            {"name": "Laptop", "value": "rt_asset_laptop"},
+            {"name": "Monitor", "value": "rt_asset_monitor"},
+            {"name": "Mouse", "value": "rt_asset_mouse"},
+            {"name": "Keyboard", "value": "rt_asset_keyboard"},
+            {"name": "Headset", "value": "rt_asset_headset"},
+            {"name": "Docking Station", "value": "rt_asset_docking_station"},
+            {"name": "Other", "value": "rt_asset_other"},
         ],
     },
     "local_request_id_field": {
@@ -896,7 +897,7 @@ def apply_setup(db: Session, settings: Settings) -> dict:
 
 
 def _asset_value(asset_type: str) -> str:
-    return asset_type.strip().lower().replace(" ", "_")
+    return "rt_asset_" + asset_type.strip().lower().replace(" ", "_")
 
 
 def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict:

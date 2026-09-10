@@ -1490,7 +1490,8 @@ Royal Tyres | IT Service Desk
 Ticket Field
 RT | Asset Type
 API type: tagger
-Options: laptop, monitor, mouse, keyboard, headset, docking_station, other
+Options: rt_asset_laptop, rt_asset_monitor, rt_asset_mouse, rt_asset_keyboard,
+         rt_asset_headset, rt_asset_docking_station, rt_asset_other
 
 Ticket Field
 RT | Local Request ID
@@ -1509,6 +1510,8 @@ Royal Tyres | IT Asset Requests
 ```
 
 The View filters tickets assigned to the Royal Tyres IT Service Desk Group and tagged `royal_tires_asset_portal`.
+
+Asset option tags use the `rt_asset_` prefix because Zendesk requires tags to be unique across ticket fields. The sandbox's unrelated Query Types field already uses `other`. UI labels and local asset values remain Laptop, Monitor, etc.; the Zendesk service maps those labels to the namespaced field values.
 
 ## Demo notification target
 
