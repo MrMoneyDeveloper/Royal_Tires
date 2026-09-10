@@ -37,6 +37,14 @@ for old, new in replacements.items():
         raise SystemExit(f"Expected spec text not found: {old[:80]!r}")
     text = text.replace(old, new, 1)
 
+# The old metadata line used Markdown hard-break spaces. Removing them keeps the
+# rewritten line clean under git diff --check.
+text = text.replace(
+    "**Hosting:** React/Vite on Render Static Sites, FastAPI on Render, Render PostgreSQL, Zendesk sandbox  \n",
+    "**Hosting:** React/Vite on Render Static Sites, FastAPI on Render, Render PostgreSQL, Zendesk sandbox\n",
+    1,
+)
+
 # Add the two page-level Views introduced after the first version of the spec.
 needle = "## `RequestDetailView.jsx`\n\nConceptual MVC View:"
 insert = """## `DashboardView.jsx`\n\nConceptual MVC View:\n\n```text\nIT Service Desk Dashboard View\n```\n\nResponsibilities:\n\n- list and search local requests;\n- filter active, solved and sync-failed records;\n- show linked Zendesk ticket/status information;\n- navigate to one request for detailed tracking.\n\n## `SettingsView.jsx`\n\nConceptual MVC View:\n\n```text\nApplication Settings View\n```\n\nResponsibilities:\n\n- show account/session context;\n- expose API diagnostics/Swagger navigation;\n- host the governed Zendesk configuration View.\n\n## `RequestDetailView.jsx`\n\nConceptual MVC View:"""
