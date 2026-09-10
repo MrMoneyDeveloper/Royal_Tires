@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.security import require_user
@@ -13,8 +13,8 @@ Database = Annotated[Session, Depends(get_db)]
 
 
 @router.post("", response_model=AssetRequestResponse, status_code=201)
-def create_request(data: AssetRequestCreate, db: Database):
-    return request_service.create_request(db, data)
+def create_request(data: AssetRequestCreate, db: Database, request: Request):
+    return request_service.create_request(db, data, request.app.state.settings)
 
 
 @router.get("", response_model=list[AssetRequestResponse])
