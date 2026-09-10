@@ -1,14 +1,16 @@
 # Royal Tyres IT Asset Request Tool
 
-An internal IT asset request portal for Mohammed Farhaan Buckas's technical interview. The authoritative requirements are in [PROJECT_SPEC.md](PROJECT_SPEC.md).
+An internal IT asset request portal for Mohammed Farhaan Buckas's Royal Tyres technical interview. The authoritative implementation notes are in [PROJECT_SPEC.md](PROJECT_SPEC.md).
 
-React/Vite views call thin FastAPI controllers, which delegate to services and SQLAlchemy models. Local development uses SQLite. The hosted application uses Vercel for the frontend, Render for FastAPI, and Render PostgreSQL. Zendesk is a secondary integration; an outage must never discard a saved request.
+React/Vite views call thin FastAPI controllers, which delegate to services and SQLAlchemy models. Local development uses SQLite. The hosted application uses Vercel for the frontend, Render for FastAPI, Render PostgreSQL for persistence, and a Zendesk sandbox as the helpdesk integration.
+
+The local SQL request is committed before any Zendesk call. A Zendesk outage therefore cannot discard an employee request.
 
 ## Local setup
 
-Prerequisites: Python 3.13 and Node.js 22.12+ (Node 24 supported).
+Prerequisites: Python 3.13 and Node.js 22.12+.
 
-Backend (from `backend`):
+Backend, from `backend`:
 
 ```powershell
 python -m venv .venv
@@ -17,9 +19,7 @@ Copy-Item .env.example .env
 .venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
-On macOS/Linux use `.venv/bin/python` and `cp .env.example .env`. Set your own demo credentials in `.env`. Never commit this file.
-
-Frontend (separate terminal, from `frontend`):
+Frontend, from `frontend`:
 
 ```sh
 npm ci
@@ -27,29 +27,89 @@ npm ci
 npm run dev
 ```
 
-Local API: `http://localhost:8000/health`. Swagger: `http://localhost:8000/docs`. Frontend: `http://localhost:5173`.
+Local API: `http://localhost:8000/health`  
+Swagger: `http://localhost:8000/docs`  
+Frontend: `http://localhost:5173`
 
 ## Validation
 
-From `backend`: `.venv\Scripts\python -m pytest`.
-From `frontend`: `npm run build`.
+Backend:
+
+```text
+python -m pytest
+```
+
+Frontend:
+
+```text
+npm test
+npm run build
+npm run test:e2e
+```
+
+GitHub Actions runs the backend suite, frontend unit tests, Vite production build and Playwright Chromium tests on pull requests and `main`.
 
 ## Environment
 
 | Variable | Purpose |
 | --- | --- |
 | `APP_USERNAME`, `APP_PASSWORD` | Backend-only demo Basic Auth credentials |
-| `DATABASE_URL` | Local SQLite or hosted Render PostgreSQL connection string |
+| `DATABASE_URL` | SQLite locally or Render PostgreSQL hosted |
 | `FRONTEND_URL` | Explicit allowed frontend origin(s) |
 | `ZENDESK_SUBDOMAIN` | Backend-only Zendesk sandbox subdomain |
 | `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` | Backend-only Zendesk API authentication |
-| `ZENDESK_WEBHOOK_SECRET` | Backend-only shared secret for later inbound webhooks |
-| `VITE_API_URL` | Public API origin, the only frontend environment variable |
+| `ZENDESK_WEBHOOK_SECRET` | Separate bearer secret for Zendesk → FastAPI status callbacks |
+| `ZENDESK_NOTIFICATION_EMAIL` | Demo email receiver; defaults to `farhaanhotd1@gmail.com` |
+| `RENDER_EXTERNAL_URL` | Render-provided public backend origin used for the webhook callback |
+| `VITE_API_URL` | Public API origin; frontend environment value |
 
-Zendesk credentials are never entered in the React application. The authenticated Zendesk Setup page only tests the server-side environment connection, discovers configuration, shows the dry-run plan and allows an explicitly approved apply.
+Zendesk credentials and webhook secrets never enter the React application.
 
-## Delivery sequence
+## Governed Zendesk setup
 
-PR1 through PR4 cover scaffold, core API, security and the authenticated request UI. PR5 adds the governed Zendesk configuration and ticket integration. Later PRs add two-way Zendesk sync, dashboard work and final hardening.
+The Zendesk Setup page follows this flow:
 
-The hosted base application is already running on Vercel + Render. PR5 is designed to wire that deployment to a Zendesk sandbox without hardcoding object IDs.
+```text
+Test backend ENV credentials
+→ discover current Zendesk state
+→ show CREATE / REUSE plan
+→ fingerprint exact plan
+→ explicit human approval
+→ re-read and reject drift
+→ apply missing resources
+→ verify all resources
+```
+
+The approved plan covers:
+
+- Brand: `Royal Tyres`
+- Group: `Royal Tyres | IT Service Desk`
+- three Royal Tyres ticket fields
+- Ticket Form: `Royal Tyres | IT Asset Request`
+- View: `Royal Tyres | IT Asset Requests`
+- Email Target: `Royal Tyres | Demo Notifications`
+- Webhook: `Royal Tyres | Asset Status Sync`
+- new-request email Trigger
+- status-change email Trigger
+- status-change portal-sync Trigger
+
+No unrelated Zendesk configuration is deleted. Existing exact resources are reused, so a partially failed deployment can be retried safely.
+
+## Live workflow
+
+```text
+Employee submits request
+→ PostgreSQL commit
+→ Zendesk ticket created
+→ demo notification email
+→ agent changes Zendesk status
+→ Zendesk trigger calls authenticated FastAPI webhook
+→ PostgreSQL status updated
+→ Track a Request reflects the new status
+```
+
+The tracking page also refreshes its local API data every 10 seconds while open and provides a manual **Refresh status** button.
+
+## Pull request progression
+
+PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 adds email notifications, webhook status callbacks and tracking-page synchronization.

@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 AssetType = Literal["Laptop", "Monitor", "Mouse", "Keyboard", "Headset", "Docking Station", "Other"]
+ZendeskTicketStatus = Literal["new", "open", "pending", "hold", "solved", "closed"]
 
 
 class AssetRequestCreate(BaseModel):
@@ -44,7 +45,8 @@ class ZendeskPlanItem(BaseModel):
     object_type: str
     name: str
     action: Literal["create", "reuse"]
-    existing_id: int | None = None
+    existing_id: int | str | None = None
+    details: str | None = None
 
 
 class ZendeskUserSummary(BaseModel):
@@ -55,6 +57,8 @@ class ZendeskUserSummary(BaseModel):
 
 class ZendeskSetupStatus(BaseModel):
     environment_configured: bool = False
+    workflow_environment_ready: bool = False
+    notification_email: str | None = None
     connected: bool
     configured: bool
     can_configure: bool
@@ -65,3 +69,20 @@ class ZendeskSetupStatus(BaseModel):
     ids: dict[str, int | None] | None = None
     verification: list[dict[str, str | int | bool | None]] = []
     message: str = ""
+
+
+class ZendeskStatusWebhook(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    event: Literal["status_changed"] = "status_changed"
+    ticket_id: int = Field(gt=0)
+    external_id: str | None = Field(default=None, max_length=150)
+    status: ZendeskTicketStatus
+
+
+class ZendeskWebhookResponse(BaseModel):
+    ok: bool
+    request_id: int
+    zendesk_ticket_id: int
+    status: str
+    changed: bool

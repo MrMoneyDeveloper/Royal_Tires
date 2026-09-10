@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     zendesk_subdomain: str = ""
     zendesk_email: str = ""
     zendesk_api_token: SecretStr = SecretStr("")
+
+    # Zendesk -> FastAPI status sync uses a separate bearer secret. Render
+    # automatically supplies RENDER_EXTERNAL_URL for the public webhook endpoint.
     zendesk_webhook_secret: SecretStr = SecretStr("")
+    zendesk_notification_email: str = "farhaanhotd1@gmail.com"
+    render_external_url: str = ""
 
     @field_validator("frontend_url")
     @classmethod

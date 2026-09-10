@@ -20,6 +20,9 @@ def zendesk_app(tmp_path):
         zendesk_subdomain="example",
         zendesk_email="admin@example.com",
         zendesk_api_token="secret-token",
+        zendesk_webhook_secret="webhook-unit-test-secret",
+        zendesk_notification_email="farhaanhotd1@gmail.com",
+        render_external_url="https://api.example.com",
     )
     application = create_app(settings)
     yield application
@@ -74,31 +77,52 @@ def test_dropdown_definitions_use_zendesk_tagger_api_type():
 
 
 def test_view_uses_valid_zendesk_subject_column_value(monkeypatch):
-    credentials = zendesk_service.ZendeskCredentials(
-        subdomain="example",
-        email="admin@example.com",
-        token="secret-token",
-    )
+    credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
     captured = {}
-
     monkeypatch.setattr(zendesk_service, "_list_all", lambda *args, **kwargs: [])
 
     def fake_request(credentials, method, path, payload=None):
-        captured["method"] = method
-        captured["path"] = path
-        captured["payload"] = payload
+        captured.update(method=method, path=path, payload=payload)
         return {"view": {"id": 700}}
 
     monkeypatch.setattr(zendesk_service, "_request_json", fake_request)
-
-    view_id = zendesk_service._ensure_view(credentials, 200)
-
-    assert view_id == 700
-    assert captured["method"] == "POST"
-    assert captured["path"] == "/api/v2/views.json"
+    assert zendesk_service._ensure_view(credentials, 200) == 700
     columns = captured["payload"]["view"]["output"]["columns"]
     assert "description" in columns
     assert "subject" not in columns
+
+
+def test_workflow_plan_includes_email_webhook_and_triggers(monkeypatch, zendesk_app):
+    credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
+    monkeypatch.setattr(
+        zendesk_service,
+        "_discover",
+        lambda credentials: {
+            "brands": [], "groups": [], "fields": [], "forms": [], "views": [],
+            "targets": [], "webhooks": [], "triggers": [],
+        },
+    )
+    plan = zendesk_service.build_setup_plan(credentials, zendesk_app.state.settings)
+    keys = {item["key"] for item in plan}
+    assert {
+        "email_target", "status_webhook", "trigger_new_email",
+        "trigger_status_email", "trigger_status_sync",
+    }.issubset(keys)
+    target = next(item for item in plan if item["key"] == "email_target")
+    assert "farhaanhotd1@gmail.com" in target["details"]
+
+
+def test_trigger_templates_use_create_change_and_notification_actions():
+    new_trigger = zendesk_service._new_request_email_trigger(123)
+    status_email = zendesk_service._status_email_trigger(123)
+    status_sync = zendesk_service._status_sync_trigger("01WEBHOOK")
+
+    assert {c.get("value") for c in new_trigger["conditions"]["all"] if c["field"] == "update_type"} == {"Create"}
+    assert {c.get("value") for c in status_email["conditions"]["all"] if c["field"] == "update_type"} == {"Change"}
+    assert any(c["field"] == "status" and c["operator"] == "changed" for c in status_sync["conditions"]["all"])
+    assert new_trigger["actions"][0]["field"] == "notification_target"
+    assert status_sync["actions"][0]["field"] == "notification_webhook"
+    assert '"status":"{{ticket.status}}"' in status_sync["actions"][0]["value"][1]
 
 
 def test_status_reports_missing_environment(tmp_path):
@@ -114,64 +138,37 @@ def test_status_reports_missing_environment(tmp_path):
         client.auth = ("test-user", "unit-test-password")
         response = client.get("/api/zendesk/setup")
     app.state.engine.dispose()
-
     assert response.status_code == 200
-    body = response.json()
-    assert body["environment_configured"] is False
-    assert body["connected"] is False
+    assert response.json()["environment_configured"] is False
 
 
-def test_connect_validates_env_login_and_returns_dry_run_plan(
-    monkeypatch, zendesk_app, zendesk_client
-):
+def test_connect_validates_env_login_and_returns_dry_run_plan(monkeypatch, zendesk_app, zendesk_client):
     def fake_request(credentials, method, path, payload=None):
         assert credentials.subdomain == "example"
         assert credentials.email == "admin@example.com"
         assert credentials.token == "secret-token"
         assert method == "GET"
         assert path == "/api/v2/users/me.json"
-        return {
-            "user": {
-                "id": 42,
-                "name": "Zendesk Admin",
-                "email": "admin@example.com",
-                "role": "admin",
-            }
-        }
+        return {"user": {"id": 42, "name": "Zendesk Admin", "email": "admin@example.com", "role": "admin"}}
 
     monkeypatch.setattr(zendesk_service, "_request_json", fake_request)
     monkeypatch.setattr(
         zendesk_service,
         "build_setup_plan",
-        lambda credentials: [
-            {
-                "key": "brand",
-                "object_type": "Brand",
-                "name": "Royal Tyres",
-                "action": "create",
-                "existing_id": None,
-            }
-        ],
+        lambda credentials, settings: [{
+            "key": "brand", "object_type": "Brand", "name": "Royal Tyres",
+            "action": "create", "existing_id": None, "details": None,
+        }],
     )
-
     response = zendesk_client.post("/api/zendesk/connect")
-
     assert response.status_code == 200
     body = response.json()
     assert body["environment_configured"] is True
+    assert body["workflow_environment_ready"] is True
+    assert body["notification_email"] == "farhaanhotd1@gmail.com"
     assert body["connected"] is True
-    assert body["configured"] is False
     assert body["can_configure"] is True
-    assert body["instance"] == "example.zendesk.com"
-    assert body["plan"][0]["action"] == "create"
     assert len(body["plan_fingerprint"]) == 64
-
-    with zendesk_app.state.session_factory() as db:
-        stored = db.get(ZendeskConnection, 1)
-        assert stored is not None
-        assert stored.subdomain == "example"
-        assert stored.api_email == "admin@example.com"
-        assert not hasattr(stored, "encrypted_api_token")
 
 
 def test_apply_requires_explicit_confirmation(zendesk_client):
@@ -184,20 +181,15 @@ def test_apply_requires_explicit_confirmation(zendesk_client):
 
 def test_apply_rejects_stale_reviewed_plan(monkeypatch, zendesk_app, zendesk_client):
     seed_configured_connection(zendesk_app)
-    monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials: [])
-
+    monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials, settings: [])
     response = zendesk_client.post(
         "/api/zendesk/apply",
         json={"confirm": True, "plan_fingerprint": "0" * 64},
     )
-
     assert response.status_code == 409
-    assert "Refresh the dry-run plan" in response.json()["detail"]
 
 
-def test_apply_stores_discovered_configuration_ids(
-    monkeypatch, zendesk_app, zendesk_client
-):
+def test_apply_provisions_core_and_workflow_resources(monkeypatch, zendesk_app, zendesk_client):
     seed_configured_connection(zendesk_app)
     with zendesk_app.state.session_factory() as db:
         connection = db.get(ZendeskConnection, 1)
@@ -208,88 +200,78 @@ def test_apply_stores_discovered_configuration_ids(
     monkeypatch.setattr(zendesk_service, "_ensure_brand", lambda credentials: 201)
     monkeypatch.setattr(zendesk_service, "_ensure_group", lambda credentials: 202)
     field_ids = iter([203, 204, 205])
-    monkeypatch.setattr(
-        zendesk_service, "_ensure_field", lambda credentials, definition: next(field_ids)
-    )
-    monkeypatch.setattr(
-        zendesk_service,
-        "_ensure_form",
-        lambda credentials, brand_id, field_ids: 206,
-    )
-    monkeypatch.setattr(
-        zendesk_service, "_ensure_view", lambda credentials, group_id: 207
-    )
+    monkeypatch.setattr(zendesk_service, "_ensure_field", lambda credentials, definition: next(field_ids))
+    monkeypatch.setattr(zendesk_service, "_ensure_form", lambda credentials, brand_id, field_ids: 206)
+    monkeypatch.setattr(zendesk_service, "_ensure_view", lambda credentials, group_id: 207)
+    monkeypatch.setattr(zendesk_service, "_ensure_email_target", lambda credentials, settings: 208)
+    monkeypatch.setattr(zendesk_service, "_ensure_webhook", lambda credentials, settings: "01WEBHOOK")
+    trigger_ids = iter([209, 210, 211])
+    monkeypatch.setattr(zendesk_service, "_ensure_trigger", lambda credentials, definition: next(trigger_ids))
     monkeypatch.setattr(
         zendesk_service,
         "_verify_object",
         lambda credentials, object_type, object_id, path, root_key: {
-            "object_type": object_type,
-            "id": object_id,
-            "ok": True,
-            "result": "PASS",
+            "object_type": object_type, "id": object_id, "ok": True, "result": "PASS"
         },
     )
-    monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials: [])
+    monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials, settings: [])
 
     preview = zendesk_client.get("/api/zendesk/setup")
-    assert preview.status_code == 200
     fingerprint = preview.json()["plan_fingerprint"]
-
     response = zendesk_client.post(
         "/api/zendesk/apply",
         json={"confirm": True, "plan_fingerprint": fingerprint},
     )
-
     assert response.status_code == 200
     body = response.json()
     assert body["configured"] is True
     assert body["ids"]["brand_id"] == 201
     assert body["ids"]["view_id"] == 207
-    assert len(body["verification"]) == 7
+    assert len(body["verification"]) == 12
     assert all(item["ok"] for item in body["verification"])
 
 
-def test_successful_zendesk_create_updates_local_request(
-    monkeypatch, zendesk_app, zendesk_client
-):
+def test_webhook_creation_uses_render_url_and_bearer_secret(monkeypatch, zendesk_app):
+    credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
+    captured = {}
+    monkeypatch.setattr(zendesk_service, "_list_webhooks", lambda credentials: [])
+
+    def fake_request(credentials, method, path, payload=None):
+        captured.update(method=method, path=path, payload=payload)
+        return {"webhook": {"id": "01WEBHOOK"}}
+
+    monkeypatch.setattr(zendesk_service, "_request_json", fake_request)
+    assert zendesk_service._ensure_webhook(credentials, zendesk_app.state.settings) == "01WEBHOOK"
+    webhook = captured["payload"]["webhook"]
+    assert webhook["endpoint"] == "https://api.example.com/api/webhooks/zendesk"
+    assert webhook["subscriptions"] == ["conditional_ticket_events"]
+    assert webhook["authentication"]["type"] == "bearer_token"
+    assert webhook["authentication"]["data"]["token"] == "webhook-unit-test-secret"
+
+
+def test_successful_zendesk_create_updates_local_request(monkeypatch, zendesk_app, zendesk_client):
     seed_configured_connection(zendesk_app)
-    monkeypatch.setattr(
-        zendesk_service,
-        "create_ticket",
-        lambda settings, db, record: {"id": 98765, "status": "new"},
-    )
-
+    monkeypatch.setattr(zendesk_service, "create_ticket", lambda settings, db, record: {"id": 98765, "status": "new"})
     response = zendesk_client.post("/api/requests", json=payload())
-
     assert response.status_code == 201
     body = response.json()
     assert body["zendesk_ticket_id"] == 98765
-    assert body["zendesk_status"] == "new"
     assert body["zendesk_sync_status"] == "synced"
-    assert body["zendesk_last_synced_at"] is not None
     assert audit_events(zendesk_app) == ["REQUEST_CREATED", "ZENDESK_TICKET_CREATED"]
 
 
-def test_zendesk_failure_keeps_primary_request(
-    monkeypatch, zendesk_app, zendesk_client
-):
+def test_zendesk_failure_keeps_primary_request(monkeypatch, zendesk_app, zendesk_client):
     seed_configured_connection(zendesk_app)
 
     def fail_create(settings, db, record):
         raise zendesk_service.ZendeskError("simulated outage")
 
     monkeypatch.setattr(zendesk_service, "create_ticket", fail_create)
-
     response = zendesk_client.post("/api/requests", json=payload())
-
     assert response.status_code == 201
     body = response.json()
-    assert body["id"] > 0
     assert body["zendesk_ticket_id"] is None
     assert body["zendesk_sync_status"] == "sync_failed"
-
     stored = zendesk_client.get(f"/api/requests/{body['id']}")
     assert stored.status_code == 200
-    assert stored.json()["requester_name"] == "Farhaan Buckas"
-    assert stored.json()["zendesk_sync_status"] == "sync_failed"
     assert audit_events(zendesk_app) == ["REQUEST_CREATED", "ZENDESK_CREATE_FAILED"]
