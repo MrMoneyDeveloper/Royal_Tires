@@ -4,7 +4,7 @@ Recorded 10 September 2026. This is observed evidence, not a claim that mocked t
 
 ## Automated checks
 
-- Backend: 70 pytest tests passed, including exact legacy-title matching, all asset payload mappings, and primary commit visibility from a separate Session before simulated Zendesk failure. Two dependency deprecation warnings remain.
+- Backend: 99 pytest tests passed, including exact legacy-title matching, all asset payload mappings, and primary commit visibility from a separate Session before simulated Zendesk failure. Two dependency deprecation warnings remain.
 - Frontend: 11 Node unit tests passed; Vite production build passed.
 - Playwright: 8 desktop/mobile Chromium tests passed. These intercept API responses and do not call the live sandbox.
 - CI and merge status are recorded in the pull request; passing local tests alone is not CI evidence.
@@ -54,7 +54,7 @@ Ticket 55's Zendesk audit identifies these additional rules replacing tags. They
 | Request Type 7 | 27698487674012 | set_tags: emergency_maintenance |
 | Query Type 6 (2) | 28370722368028 | set_tags: customer_complaint |
 
-Each is active with ALL Status less than Solved and no ANY conditions. The proposed narrow change is only an added Brand IS NOT Royal Tyres condition, retaining the existing action/conditions/state/title/order. Separate owner approval is required.
+Each is active with ALL Status less than Solved and no ANY conditions. The proposed narrow change is only an added Brand IS NOT Royal Tyres condition, retaining the existing action/conditions/state/title/order. The owner approved these six exact exclusions. Fresh definitions matched the retained reviewed originals; the existing safeguard service applied only the added exclusion. All thirteen preservation checks passed. Expanded plan fingerprint: `9f2b47863be9da01cbcd8a75b7f27ea12a89d98ed56ec6719ee28f3df253a8aa`.
 
 ## Callback and email
 
@@ -62,8 +62,31 @@ Pending was not submitted after the field/tag verification failed. Therefore the
 
 ## Hosting issue
 
-Direct GET `/request` returned HTTP 404 while `/` served the application. Render needs a Static Site **Rewrite**, source `/*`, destination `/index.html`, to support SPA deep links and refreshes. The repository's Vercel rewrite file does not configure Render. Existing resources are served before rewrites according to [Render's documented rule matching](https://render.com/docs/redirects-rewrites). Dashboard access is required to apply this rule with the available tools.
+Direct GET `/request` returned HTTP 404 while `/` served the application. Render needs a Static Site **Rewrite**, source `/*`, destination `/index.html`, to support SPA deep links and refreshes. The repository's Vercel rewrite file does not configure Render. Existing resources are served before rewrites according to [Render's documented rule matching](https://render.com/docs/redirects-rewrites). The owner signed in and the exact rewrite was saved in Render. Subsequent direct GETs to `/`, `/request`, `/requests/5`, and `/settings` returned HTTP 200 with the React root markup.
 
 ## Targeted security review
 
 Basic Auth protects request/setup routes (live unauthenticated request returned 401). Webhook authentication is a separate bearer check. Hosted CORS preflight permits the exact Render frontend origin; tests reject unconfigured origins. Pydantic validates input and suppresses raw values in errors. ORM queries use bound values; the SQL-injection regression treats attack-shaped input as data. React renders user text normally and the browser XSS regression passes. Changed files/docs and frontend environment were checked against configured secret values without printing them. No configured secret was found. Secrets remain server-side; no Authorization values are included in this report.
+
+## Replacement request and remaining stop boundary
+
+The permitted replacement test was made because request 5 failed retention. No other fresh requests were created in this pass.
+
+- React submitted request **6**, HTTP 201; real Zendesk ticket **56**; external ID `royal-tires-asset-6`; asset Other.
+- Render PostgreSQL confirms request 6 remains persisted, status `new`, Zendesk status `new`, sync state `synced`, last synced `2026-09-10T21:49:31.906434Z`.
+- Brand/group/form and local-ID field remain correct. Asset/source dropdowns and required tags were initially supplied correctly but overwritten by additional automation. `synced` records successful ticket creation, not field-retention validation.
+- Ticket 56 audit identifies **Query Type 8 (27650061836572)**, **Issue Type 8 (27695960731292)**, **Request Type 8 (27698470929052)** and **Query Type 7 (2) (28370770616604)** replacing tags. The owner subsequently approved these four exact exclusions; all seventeen read-back preservation checks passed.
+- Each has ALL Status less than Solved, no ANY conditions, and one set_tags action. A controlled Pending update then exposed further tag-replacement rules. A complete read-only inventory found thirteen remaining active set_tags rules, each with only Status less than Solved. The owner approved those exact names/IDs, recorded in PROJECT_SPEC.md.
+- Email generation/delivery remains unverified. The integration is re-tested below after the final approved exclusions.
+
+The failed Pending attempt changed ticket 56 remotely but the portal remained New because the tag-dependent callback did not match. No additional request was submitted. The final test repairs the same ticket, restores Open (Zendesk rejects resetting to New), and then changes it to Pending.
+
+## Final safeguards and demonstrated callback bug
+
+All thirty explicitly approved safeguards passed preservation/read-back checks; the last plan fingerprint was `85b74616c8fc54b40b0d030c5aa5dc35ca08f94056ef4cd940b6266250577ea1`. Only brand exclusions were added. Original JSON definitions are retained locally outside Git.
+
+Ticket 56 was repaired in place and now retains Brand/Group/Form, all three managed fields, the required portal/request tags and external ID. Its Open-to-Pending audit records both the status-email `External` event and status-sync `WebhookEvent`. That proves trigger execution, not inbox delivery. No third request was created.
+
+Render received POST `/api/webhooks/zendesk` at 21:55:54 and 21:56:20 UTC, but returned 422. Zendesk's invocation-attempt payload showed status `Pending`; the safe response identified the lowercase status literal validation failure. Headers were not inspected or recorded. `WebhookStatus` input normalization now accepts trimmed/case-normalized known labels while rejecting unknown values; regression tests verify Pending reaches the tracking API and invalid values still return 422. Portal/database statuses remain lowercase. Authentication and correlation behavior are unchanged.
+
+The source fix passes all 99 backend tests. The deployed callback must be rechecked after the PR's automatic Render deployment; final CI/deployment/runtime evidence is recorded on PR #19. No successful callback is claimed by this pre-deployment snapshot. New-request email execution was blocked at initial creation and remains unverified; status-email execution is evidenced, actual delivery remains an inbox check.

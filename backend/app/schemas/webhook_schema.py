@@ -13,7 +13,7 @@ FLOW: FastAPI Webhook Controller -> this module -> Pydantic literals and constra
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ZendeskTicketStatus = Literal["new", "open", "pending", "hold", "solved", "closed"]
 
@@ -25,6 +25,13 @@ class ZendeskStatusWebhook(BaseModel):
     ticket_id: int = Field(gt=0)
     external_id: str | None = Field(default=None, max_length=150)
     status: ZendeskTicketStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value):
+        # Zendesk Liquid renders display labels such as "Pending"; persistence
+        # and API responses use canonical lowercase status values.
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 class ZendeskWebhookResponse(BaseModel):

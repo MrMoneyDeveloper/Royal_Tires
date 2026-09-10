@@ -1940,3 +1940,11 @@ Zendesk              → external integration through Services
 ```
 
 The goal is not the largest system. The goal is a **small, understandable and demonstrably reliable application whose architecture can be explained file by file under questioning**.
+
+The owner subsequently approved six additional exact safeguards after ticket 55 proved interference: `Issue Category 2 2` (27601293620508), `Request Type 5` (27625845148444), `Query Type 7` (27650068343452), `Issue Type 7` (27695967421724), `Request Type 7` (27698487674012), and `Query Type 6 (2)` (28370722368028). The opt-in allowlist now contains thirty confirmed titles. Each receives only Brand IS NOT Royal Tyres; unrelated automation remains untouched. Discovery-to-write drift is rejected with HTTP 409.
+
+Following ticket 56 audit evidence, the owner also approved `Query Type 8` (27650061836572), `Issue Type 8` (27695960731292), `Request Type 8` (27698470929052), and `Query Type 7 (2)` (28370770616604), under the same preservation and drift rules.
+
+The owner approved the remaining thirteen exact active tag-replacement rules after reviewing the complete inventory: `Query Type 9` (27650056621980), `Query Type 10` (27650047286556), `Issue Type 9` (27695960756636), `Issue Type 10` (27695935951644), `Request Type 9` (27698464442908), `Request Type 10` (27698464469660), `Request Type 11` (27698464480668), `Request Type 6 (2)` (27698493243036), `Request Type 7 (2)` (27698468769436), `Request Type 8 (2)` (27698482470044), `Request Type 9 (2)` (27698501217564), `Request Type 10 (2)` (27698476163868), `Request Type 11 (2)` (27698504442140). This completes the thirty-title explicit allowlist; it does not authorize arbitrary future rules.
+
+Webhook input accepts case-normalized Zendesk display labels (for example `Pending`) while persistence and responses remain canonical lowercase. Unsupported statuses still fail schema validation.

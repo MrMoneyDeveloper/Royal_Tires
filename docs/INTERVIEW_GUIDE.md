@@ -78,13 +78,13 @@ Service = why/when an operation happens. Repository = how persistence is perform
 
 ### `backend/app/services/legacy_trigger_guard.py`
 
-- **What it is:** Opt-in Service for seven confirmed legacy trigger exclusions
+- **What it is:** Opt-in Service for thirty explicitly approved legacy trigger exclusions
 - **Who calls it:** Zendesk Controller within governed setup
 - **What it calls:** ZendeskService HTTP/discovery helpers
 - **Why it exists:** Isolate known sandbox interference without disabling unrelated automation.
 - **Data handled:** Settings and discovered Royal Tyres brand ID → UPDATE/REUSE/SKIP plan and preservation verification
 - **Security / reliability:** Only listed titles may change. Adds Brand IS NOT Royal Tyres and resends existing actions because updating conditions alone can clear actions. Snapshots contribute to the controller plan; read-back compares protected properties.
-- **One interview sentence:** “Opt-in Service for seven confirmed legacy trigger exclusions: isolate known sandbox interference without disabling unrelated automation.”
+- **One interview sentence:** “Opt-in Service for thirty explicitly approved legacy trigger exclusions: isolate known sandbox interference without disabling unrelated automation.”
 
 ### `backend/app/repositories/request_repository.py`
 
@@ -547,3 +547,5 @@ Backend tests run FastAPI against temporary SQLite and mock Zendesk; they cover 
 - Database commit precedes ticket creation, but the two systems cannot share one SQL transaction. Expected integration failure is audited; reconciliation remains a later enhancement.
 - Dashboard search and counts cover the latest 100 loaded records. Only RequestDetailView polls automatically.
 - See [live verification](LIVE_VERIFICATION.md) for actual IDs, results and manual delivery checks. The example IDs in README are not test evidence.
+
+Webhook boundary detail: Zendesk Liquid sends display labels such as `Pending`. The webhook schema normalizes known status labels to lowercase before Literal validation; unknown statuses still fail. This corrects observed live 422 responses without changing the stored status vocabulary.

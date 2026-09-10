@@ -172,3 +172,54 @@ def test_confirmed_hello_world_title_is_planned_without_matching_similar_rule(mo
     assert len(matches) == 1
     assert matches[0]["name"] == "hello world"
     assert matches[0]["existing_id"] == confirmed["id"]
+
+
+@pytest.mark.parametrize("title,trigger_id", [
+    ("Issue Category 2 2", 27601293620508),
+    ("Request Type 5", 27625845148444),
+    ("Query Type 7", 27650068343452),
+    ("Issue Type 7", 27695967421724),
+    ("Request Type 7", 27698487674012),
+    ("Query Type 6 (2)", 28370722368028),
+    ("Query Type 8", 27650061836572),
+    ("Issue Type 8", 27695960731292),
+    ("Request Type 8", 27698470929052),
+    ("Query Type 7 (2)", 28370770616604),
+    ("Query Type 9", 27650056621980),
+    ("Query Type 10", 27650047286556),
+    ("Issue Type 9", 27695960756636),
+    ("Issue Type 10", 27695935951644),
+    ("Request Type 9", 27698464442908),
+    ("Request Type 10", 27698464469660),
+    ("Request Type 11", 27698464480668),
+    ("Request Type 6 (2)", 27698493243036),
+    ("Request Type 7 (2)", 27698468769436),
+    ("Request Type 8 (2)", 27698482470044),
+    ("Request Type 9 (2)", 27698501217564),
+    ("Request Type 10 (2)", 27698476163868),
+    ("Request Type 11 (2)", 27698504442140),
+
+])
+def test_additional_approved_titles_do_not_match_similar_rules(monkeypatch, settings, title, trigger_id):
+    confirmed = _trigger(trigger_id, title)
+    similar = _trigger(999, title + " unrelated")
+    monkeypatch.setattr(zendesk_service, "_list_all", lambda credentials, path, root_key:
+        [confirmed, similar] if root_key == "triggers" else [{"id": 42, "name": "Royal Tyres"}])
+    updates = [item for item in legacy_trigger_guard.build_plan(settings) if item["action"] == "update"]
+    assert [(item["name"], item["existing_id"]) for item in updates] == [(title, trigger_id)]
+
+
+def test_drift_between_discovery_and_mutation_stops_without_writes(monkeypatch, settings):
+    original = _trigger(101, legacy_trigger_guard.LEGACY_TRIGGER_TITLES[0])
+    changed = dict(original, actions=[{"field": "set_tags", "value": "changed"}])
+    monkeypatch.setattr(zendesk_service, "_list_all", lambda *args: [original])
+    writes = []
+    def request(credentials, method, path, payload=None):
+        if method != "GET":
+            writes.append(method)
+        return {"trigger": changed}
+    monkeypatch.setattr(zendesk_service, "_request_json", request)
+    with pytest.raises(zendesk_service.ZendeskError) as exc:
+        legacy_trigger_guard.apply_exclusions(settings, 42)
+    assert exc.value.status_code == 409
+    assert writes == []
