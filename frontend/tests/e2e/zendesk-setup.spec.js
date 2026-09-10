@@ -139,12 +139,13 @@ test('tests env credentials, previews governed changes and explicitly applies th
     return route.fulfill({ status: 404, json: { detail: 'Not found' } });
   });
 
-  await page.goto('/zendesk-setup');
+  await page.goto('/settings');
   await page.getByLabel('Username', { exact: true }).fill('test-user');
   await page.getByLabel('Password', { exact: true }).fill('test-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Zendesk configuration' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Zendesk push & status sync' })).toBeVisible();
   await expect(page.getByText('Zendesk environment variables detected')).toBeVisible();
   await page.getByRole('button', { name: /Test environment connection/ }).click();
 
