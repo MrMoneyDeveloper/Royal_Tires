@@ -10,6 +10,9 @@ def app(tmp_path):
     settings = Settings(
         _env_file=None,
         database_url=f"sqlite:///{(tmp_path / 'requests.db').as_posix()}",
+        app_username="test-user",
+        app_password="unit-test-password",
+        frontend_url="http://localhost:5173,https://portal.example.com",
     )
     application = create_app(settings)
     yield application
@@ -19,6 +22,7 @@ def app(tmp_path):
 @pytest.fixture
 def client(app):
     with TestClient(app) as test_client:
+        test_client.auth = ("test-user", "unit-test-password")
         yield test_client
 
 
