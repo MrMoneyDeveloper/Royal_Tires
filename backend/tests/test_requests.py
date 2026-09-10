@@ -78,6 +78,7 @@ def test_text_fields_are_trimmed(client, request_payload):
         ("asset_type", "Server"),
         ("reason", "Too short"),
         ("reason", " " * 20),
+        ("reason", "a\n\n\n\n\n\t    b\n\n\n\n\n    c"),
         ("reason", "x" * 1001),
     ],
 )
@@ -91,6 +92,17 @@ def test_invalid_input_is_rejected_without_persistence(
     with app.state.session_factory() as session:
         assert session.scalars(select(AssetRequest)).all() == []
         assert session.scalars(select(AuditLog)).all() == []
+
+
+def test_formatted_reason_with_ten_meaningful_characters_is_accepted(
+    client, request_payload
+):
+    response = client.post(
+        "/api/requests",
+        json={**request_payload, "reason": "abcde\n\n  fghij"},
+    )
+    assert response.status_code == 201
+    assert response.json()["reason"] == "abcde\n\n  fghij"
 
 
 def test_missing_reason_is_rejected(client, request_payload):
