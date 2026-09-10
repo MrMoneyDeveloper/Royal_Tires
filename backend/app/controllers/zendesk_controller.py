@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.security import require_user
 from app.database import get_db
 from app.schemas import ZendeskApplyRequest, ZendeskSetupStatus
-from app.services import zendesk_service
+from app.services import legacy_trigger_guard, zendesk_service
 
 router = APIRouter(
     prefix="/api/zendesk",
@@ -29,6 +29,18 @@ def _plan_fingerprint(plan: list[dict]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _with_legacy_guard_plan(status: dict, settings) -> dict:
+    """Add the opt-in sandbox isolation changes to the same approval plan."""
+    if not settings.zendesk_legacy_trigger_guard_enabled or not status.get("connected"):
+        return status
+    status = dict(status)
+    status["plan"] = [
+        *(status.get("plan") or []),
+        *legacy_trigger_guard.build_plan(settings),
+    ]
+    return status
+
+
 def _with_plan_fingerprint(status: dict) -> dict:
     status = dict(status)
     status["plan_fingerprint"] = _plan_fingerprint(status.get("plan") or [])
@@ -38,7 +50,9 @@ def _with_plan_fingerprint(status: dict) -> dict:
 @router.get("/setup", response_model=ZendeskSetupStatus)
 def get_setup(db: Database, request: Request):
     try:
-        status = zendesk_service.get_setup_status(db, request.app.state.settings)
+        settings = request.app.state.settings
+        status = zendesk_service.get_setup_status(db, settings)
+        status = _with_legacy_guard_plan(status, settings)
         return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
@@ -48,7 +62,9 @@ def get_setup(db: Database, request: Request):
 def connect(db: Database, request: Request):
     """Test Zendesk credentials already configured in the backend environment."""
     try:
-        status = zendesk_service.connect(db, request.app.state.settings)
+        settings = request.app.state.settings
+        status = zendesk_service.connect(db, settings)
+        status = _with_legacy_guard_plan(status, settings)
         return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
@@ -62,9 +78,11 @@ def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
             detail="Explicit confirmation is required before Zendesk configuration is changed.",
         )
     try:
+        settings = request.app.state.settings
         # Re-read Zendesk immediately before mutation and refuse to deploy if the
         # current plan no longer matches the exact preview the admin approved.
-        current = zendesk_service.get_setup_status(db, request.app.state.settings)
+        current = zendesk_service.get_setup_status(db, settings)
+        current = _with_legacy_guard_plan(current, settings)
         current_fingerprint = _plan_fingerprint(current.get("plan") or [])
         if data.plan_fingerprint != current_fingerprint:
             raise HTTPException(
@@ -75,7 +93,26 @@ def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
                 ),
             )
 
-        status = zendesk_service.apply_setup(db, request.app.state.settings)
+        status = zendesk_service.apply_setup(db, settings)
+        if settings.zendesk_legacy_trigger_guard_enabled:
+            brand_id = (status.get("ids") or {}).get("brand_id")
+            if not isinstance(brand_id, int):
+                raise zendesk_service.ZendeskError(
+                    "Royal Tyres brand ID is unavailable for the legacy trigger safeguard.",
+                    502,
+                )
+            guard_verification = legacy_trigger_guard.apply_exclusions(settings, brand_id)
+            status = dict(status)
+            status["verification"] = [
+                *(status.get("verification") or []),
+                *guard_verification,
+            ]
+            status["message"] = (
+                f"{status.get('message', '').strip()} "
+                "Confirmed legacy sandbox triggers are isolated from the Royal Tyres brand."
+            ).strip()
+            status = _with_legacy_guard_plan(status, settings)
+
         return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error

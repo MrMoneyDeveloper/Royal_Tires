@@ -44,7 +44,7 @@ class ZendeskPlanItem(BaseModel):
     key: str
     object_type: str
     name: str
-    action: Literal["create", "reuse"]
+    action: Literal["create", "reuse", "update", "skip"]
     existing_id: int | str | None = None
     details: str | None = None
 

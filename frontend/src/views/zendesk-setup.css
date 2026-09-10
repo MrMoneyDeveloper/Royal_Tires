@@ -133,6 +133,16 @@
   color: #214c3c;
 }
 
+.plan-action.update {
+  background: #e7eef8;
+  color: #244d73;
+}
+
+.plan-action.skip {
+  background: #f0f2ed;
+  color: #667268;
+}
+
 .confirm-box {
   display: flex;
   align-items: flex-start;
