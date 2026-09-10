@@ -1,0 +1,222 @@
+.zendesk-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.zendesk-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.zendesk-panel-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.setup-copy {
+  font-size: 12px;
+  margin-bottom: 24px;
+}
+
+.setup-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f0f2ed;
+  color: #667268;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.setup-chip.ok {
+  background: #e5efce;
+  color: #214c3c;
+}
+
+.connection-summary {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #f5f7f1;
+  border: 1px solid #dfe5dd;
+}
+
+.connection-summary strong {
+  font-size: 13px;
+}
+
+.connection-summary span {
+  color: #68766e;
+  font-size: 11px;
+}
+
+.setup-notice {
+  margin-bottom: 16px;
+  background: #f8faf5;
+}
+
+.plan-list {
+  border: 1px solid #dfe5dd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 14px;
+  background: #fff;
+  border-bottom: 1px solid #edf0ea;
+}
+
+.plan-row:last-child {
+  border-bottom: 0;
+}
+
+.plan-row > div:first-child {
+  min-width: 0;
+}
+
+.plan-row strong,
+.plan-row span {
+  display: block;
+}
+
+.plan-row strong {
+  font-size: 12px;
+}
+
+.plan-row > div:first-child span {
+  color: #768178;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.plan-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.plan-result small {
+  color: #71806e;
+  font-size: 10px;
+}
+
+.plan-action {
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.plan-action.create {
+  background: #fff1cc;
+  color: #745900;
+}
+
+.plan-action.reuse {
+  background: #e5efce;
+  color: #214c3c;
+}
+
+.confirm-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #dfe5dd;
+  border-radius: 8px;
+  background: #fafbf7;
+  color: #4f6055;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.confirm-box input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.verification-panel {
+  margin-top: 24px;
+}
+
+.verification-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.verification-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #dfe5dd;
+  border-radius: 7px;
+  background: #fafbf7;
+}
+
+.verification-item strong,
+.verification-item small {
+  display: block;
+}
+
+.verification-item strong {
+  font-size: 11px;
+}
+
+.verification-item small {
+  color: #71806e;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.verify-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b14d3c;
+  flex-shrink: 0;
+}
+
+.verify-dot.ok {
+  background: #6f984f;
+}
+
+@media (max-width: 960px) {
+  .zendesk-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .verification-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .verification-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .zendesk-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
