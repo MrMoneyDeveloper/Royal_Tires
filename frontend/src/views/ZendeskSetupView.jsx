@@ -87,8 +87,8 @@ export default function ZendeskSetupView({ api }) {
           </div>
 
           <p className="muted setup-copy">
-            Zendesk domain, API email and API token are configured server-side in
-            Render. The browser never receives or stores the Zendesk API token.
+            Zendesk credentials and the status-sync secret are server-side in Render.
+            The browser never receives the API token or webhook secret.
           </p>
 
           <div className="connection-summary" aria-live="polite">
@@ -100,6 +100,12 @@ export default function ZendeskSetupView({ api }) {
             <span>ZENDESK_SUBDOMAIN</span>
             <span>ZENDESK_EMAIL</span>
             <span>ZENDESK_API_TOKEN · hidden server-side</span>
+            <span>
+              ZENDESK_WEBHOOK_SECRET · {setup?.workflow_environment_ready ? 'detected' : 'required before apply'}
+            </span>
+            {setup?.notification_email && (
+              <span>Demo notifications → {setup.notification_email}</span>
+            )}
           </div>
 
           <div className="action-row">
@@ -135,7 +141,7 @@ export default function ZendeskSetupView({ api }) {
           <div className="zendesk-panel-heading">
             <div>
               <p className="eyebrow">02 · DRY RUN</p>
-              <h2>Configuration plan</h2>
+              <h2>Configuration + workflow plan</h2>
             </div>
             <span className={`setup-chip ${setup?.configured ? 'ok' : ''}`}>
               {setup?.configured ? 'Configured' : 'Review first'}
@@ -162,6 +168,7 @@ export default function ZendeskSetupView({ api }) {
                     <div>
                       <strong>{item.name}</strong>
                       <span>{item.object_type}</span>
+                      {item.details ? <small>{item.details}</small> : null}
                     </div>
                     <div className="plan-result">
                       <span className={`plan-action ${item.action}`}>
@@ -189,7 +196,8 @@ export default function ZendeskSetupView({ api }) {
                 />
                 <span>
                   I reviewed this exact dry-run plan. Create only the missing Royal
-                  Tyres configuration and do not delete unrelated Zendesk data.
+                  Tyres configuration, email notification target, webhook and triggers,
+                  and do not delete unrelated Zendesk data.
                 </span>
               </label>
 
@@ -217,10 +225,17 @@ export default function ZendeskSetupView({ api }) {
                 </button>
               </div>
 
-              {!setup.can_configure && (
+              {setup.user?.role !== 'admin' && (
                 <p className="notice error">
                   The configured Zendesk user is not an admin. An admin API identity is
-                  required to create brands, groups, fields, forms and views.
+                  required to create configuration and workflow resources.
+                </p>
+              )}
+
+              {setup.user?.role === 'admin' && !setup.workflow_environment_ready && (
+                <p className="notice error">
+                  Add ZENDESK_WEBHOOK_SECRET to the Render backend environment before
+                  Apply. The webhook and status-sync trigger will use it as a bearer secret.
                 </p>
               )}
             </>
