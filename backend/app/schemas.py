@@ -44,6 +44,7 @@ class ZendeskApplyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirm: bool
+    plan_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class ZendeskPlanItem(BaseModel):
@@ -67,6 +68,7 @@ class ZendeskSetupStatus(BaseModel):
     instance: str | None = None
     user: ZendeskUserSummary | None = None
     plan: list[ZendeskPlanItem] = []
+    plan_fingerprint: str | None = None
     ids: dict[str, int | None] | None = None
     verification: list[dict[str, str | int | bool | None]] = []
     message: str = ""
