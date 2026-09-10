@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
-import { ASSET_TYPES, validateRequest } from '../services/validation.js';
+import {
+  ASSET_TYPES,
+  meaningfulCharacterCount,
+  validateRequest,
+} from '../services/validation.js';
 
 const initialValues = {
   requester_name: '',
@@ -133,10 +137,12 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
                 {errors.reason}
               </span>
             ) : (
-              'A little context helps IT understand your request. Minimum 10 characters.'
+              'A little context helps IT understand your request. Minimum 10 meaningful characters.'
             )}
           </span>
-          <span>{values.reason.length}/1000</span>
+          <span>
+            {meaningfulCharacterCount(values.reason)} meaningful · {values.reason.length}/1000 total
+          </span>
         </div>
       </div>
       {error && (
