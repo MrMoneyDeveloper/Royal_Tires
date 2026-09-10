@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     app_username: str = ""
     app_password: SecretStr = SecretStr("")
     frontend_url: str = ""
+
+    # Zendesk integration credentials are server-side environment variables.
+    # They are never returned to the frontend or stored in PostgreSQL.
     zendesk_subdomain: str = ""
     zendesk_email: str = ""
     zendesk_api_token: SecretStr = SecretStr("")
@@ -21,12 +24,23 @@ class Settings(BaseSettings):
     def validate_origins(cls, value: str) -> str:
         for origin in filter(None, (part.strip() for part in value.split(","))):
             url = urlsplit(origin)
-            if (url.scheme not in {"http", "https"} or not url.hostname or
-                    url.username or url.password or url.path not in {"", "/"} or
-                    url.query or url.fragment or "*" in origin):
+            if (
+                url.scheme not in {"http", "https"}
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.path not in {"", "/"}
+                or url.query
+                or url.fragment
+                or "*" in origin
+            ):
                 raise ValueError("FRONTEND_URL must contain explicit HTTP(S) origins")
         return value
 
     @property
     def allowed_origins(self) -> list[str]:
-        return [part.strip().rstrip("/") for part in self.frontend_url.split(",") if part.strip()]
+        return [
+            part.strip().rstrip("/")
+            for part in self.frontend_url.split(",")
+            if part.strip()
+        ]

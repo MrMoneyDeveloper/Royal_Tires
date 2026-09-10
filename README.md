@@ -40,14 +40,16 @@ From `frontend`: `npm run build`.
 | --- | --- |
 | `APP_USERNAME`, `APP_PASSWORD` | Backend-only demo Basic Auth credentials |
 | `DATABASE_URL` | Local SQLite or hosted Render PostgreSQL connection string |
-| `FRONTEND_URL` | Allowed frontend origin, supplied through backend environment |
-| `ZENDESK_SUBDOMAIN` | Authorised sandbox subdomain from the specification |
+| `FRONTEND_URL` | Explicit allowed frontend origin(s) |
+| `ZENDESK_SUBDOMAIN` | Backend-only Zendesk sandbox subdomain |
 | `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` | Backend-only Zendesk API authentication |
-| `ZENDESK_WEBHOOK_SECRET` | Backend-only shared secret for inbound webhooks |
+| `ZENDESK_WEBHOOK_SECRET` | Backend-only shared secret for later inbound webhooks |
 | `VITE_API_URL` | Public API origin, the only frontend environment variable |
+
+Zendesk credentials are never entered in the React application. The authenticated Zendesk Setup page only tests the server-side environment connection, discovers configuration, shows the dry-run plan and allows an explicitly approved apply.
 
 ## Delivery sequence
 
-The nine named branches and pull requests in specification Section 29 cover scaffold, core API, security, request UI, Zendesk creation, webhook/reconciliation, dashboard, deployment, and final documentation. Each starts from updated `main` and is tested and reviewed before merge.
+PR1 through PR4 cover scaffold, core API, security and the authenticated request UI. PR5 adds the governed Zendesk configuration and ticket integration. Later PRs add two-way Zendesk sync, dashboard work and final hardening.
 
-This scaffold contains a running frontend, `/health`, and Swagger. Business endpoints and deployment configuration will arrive in their specified phases.
+The hosted base application is already running on Vercel + Render. PR5 is designed to wire that deployment to a Zendesk sandbox without hardcoding object IDs.
