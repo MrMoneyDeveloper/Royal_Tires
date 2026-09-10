@@ -73,7 +73,7 @@ backend/app/
 └── main.py                # application composition root
 ```
 
-`backend/app/database.py` remains only as a small compatibility facade for older imports in the large Zendesk integration module. Engine/session/base implementation lives in `data/`; new code imports from the physical data layer.
+SQLAlchemy infrastructure lives exclusively in `backend/app/data/`. Controllers and services import the data/session modules directly; there is no root database compatibility facade.
 
 The interview explanation is therefore direct:
 

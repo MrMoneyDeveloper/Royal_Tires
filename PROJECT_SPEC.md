@@ -116,9 +116,9 @@ The solution uses Python and React, but the architecture is intentionally mapped
 | Partial View | smaller reusable React components |
 | Controller | FastAPI routers in `backend/app/controllers/` |
 | Service | business logic in `backend/app/services/` |
-| Repository | SQLAlchemy data access functions |
-| DbContext | `database.py`, SQLAlchemy engine, Base and scoped Session |
-| ViewModel / DTO | Pydantic schemas in `backend/app/schemas.py` |
+| Repository | SQLAlchemy data access in `backend/app/repositories/` |
+| DbContext | `backend/app/data/` (`base.py`, `db_context.py`, `session.py`) |
+| ViewModel / DTO | Pydantic schemas in `backend/app/schemas/` |
 | Middleware | FastAPI/CORS/request middleware around the controller pipeline |
 | Helpers | small reusable formatting/validation/integration utilities |
 | appsettings.json | Pydantic `Settings` + Render environment variables |
@@ -130,87 +130,85 @@ The names are a mental bridge. The implementation still follows the conventions 
 
 # 4. Current Physical Repository Map
 
-This is the **actual current code layout** on `main`.
+This is the **actual current code layout** after the MVC physical-structure refactor.
 
 ```text
 Royal_Tires/
 │
 ├── PROJECT_SPEC.md
 ├── README.md
-├── .github/
-│   └── workflows/
-│       └── ci.yml
+├── .github/workflows/ci.yml
 │
 ├── backend/
-│   ├── .env.example
-│   ├── requirements.txt
-│   ├── pytest.ini
-│   │
 │   ├── app/
 │   │   ├── main.py
-│   │   ├── database.py
-│   │   ├── repository.py
-│   │   ├── schemas.py
-│   │   │
 │   │   ├── controllers/
 │   │   │   ├── request_controller.py
 │   │   │   ├── zendesk_controller.py
 │   │   │   └── webhook_controller.py
-│   │   │
+│   │   ├── services/
+│   │   │   ├── request_service.py
+│   │   │   ├── zendesk_service.py
+│   │   │   ├── webhook_service.py
+│   │   │   └── legacy_trigger_guard.py
+│   │   ├── repositories/
+│   │   │   ├── request_repository.py
+│   │   │   ├── audit_repository.py
+│   │   │   └── zendesk_repository.py
 │   │   ├── models/
 │   │   │   ├── asset_request.py
 │   │   │   ├── audit_log.py
 │   │   │   └── zendesk_connection.py
-│   │   │
-│   │   ├── services/
-│   │   │   ├── request_service.py
-│   │   │   ├── zendesk_service.py
-│   │   │   └── webhook_service.py
-│   │   │
+│   │   ├── schemas/
+│   │   │   ├── request_schema.py
+│   │   │   ├── zendesk_schema.py
+│   │   │   └── webhook_schema.py
+│   │   ├── data/
+│   │   │   ├── base.py
+│   │   │   ├── db_context.py
+│   │   │   └── session.py
+│   │   ├── middleware/
+│   │   │   ├── request_logging.py
+│   │   │   └── security_headers.py
+│   │   ├── helpers/
+│   │   │   └── request_identity.py
 │   │   └── core/
 │   │       ├── config.py
 │   │       ├── security.py
 │   │       └── logging_config.py
-│   │
 │   └── tests/
-│       ├── conftest.py
-│       ├── test_auth.py
-│       ├── test_health.py
-│       ├── test_requests.py
-│       ├── test_security.py
-│       ├── test_webhook.py
-│       └── test_zendesk.py
 │
 └── frontend/
-    ├── package.json
-    ├── playwright.config.js
-    ├── vercel.json
-    │
     ├── src/
     │   ├── main.jsx
     │   ├── App.jsx
-    │   ├── styles.css
-    │   │
     │   ├── views/
     │   │   ├── RequestView.jsx
+    │   │   ├── DashboardView.jsx
     │   │   ├── RequestDetailView.jsx
-    │   │   ├── ZendeskSetupView.jsx
-    │   │   └── zendesk-setup.css
-    │   │
+    │   │   ├── SettingsView.jsx
+    │   │   └── ZendeskSetupView.jsx
+    │   ├── layouts/
+    │   │   ├── AppLayout.jsx
+    │   │   └── AuthLayout.jsx
     │   ├── components/
+    │   │   ├── shared/
+    │   │   │   ├── Brand.jsx
+    │   │   │   ├── Sidebar.jsx
+    │   │   │   ├── Topbar.jsx
+    │   │   │   └── Footer.jsx
     │   │   ├── AppLink.jsx
     │   │   ├── AssetRequestForm.jsx
-    │   │   └── StatusBadge.jsx
-    │   │
-    │   └── services/
-    │       └── api.js
-    │
+    │   │   ├── StatusBadge.jsx
+    │   │   └── SyncStatePanel.jsx
+    │   ├── services/api.js
+    │   └── helpers/
+    │       ├── formatting.js
+    │       └── validation.js
     └── tests/
-        ├── *.test.js
-        └── e2e/
 ```
 
-This layout already contains the important layers. The sections below define what each file means in the MVC mental model and where future refactors should move cross-cutting code.
+The physical folders now match the MVC mental model. There are no compatibility facade modules for the retired root `repository.py`, `schemas.py` or `database.py` locations.
 
 ---
 
@@ -609,7 +607,7 @@ Controllers own HTTP. Repositories own SQL. Models own persisted state.
 Current physical location:
 
 ```text
-backend/app/repository.py
+backend/app/repositories/
 ```
 
 Conceptual mapping:
@@ -646,10 +644,12 @@ A Repository should not decide whether a Zendesk call occurs before or after a d
 
 The project is not using Entity Framework Core, so there is no literal EF `DbContext` class.
 
-For the MVC mental model, the following current code is the **DbContext equivalent**:
+For the MVC mental model, the SQLAlchemy **DbContext equivalent** is physically split by responsibility:
 
 ```text
-backend/app/database.py
+backend/app/data/base.py
+backend/app/data/db_context.py
+backend/app/data/session.py
 ```
 
 It owns:
@@ -695,7 +695,7 @@ The name `DbContext` may be used in documentation as a teaching/mental-model ali
 Current physical location:
 
 ```text
-backend/app/schemas.py
+backend/app/schemas/
 ```
 
 Conceptual mapping:
@@ -739,10 +739,11 @@ backend/app/schemas/
 
 **Purpose:** handle cross-cutting HTTP behavior that applies around Controllers rather than inside individual business use cases.
 
-Current middleware behavior is partly defined directly in:
+Current middleware is physically isolated in:
 
 ```text
-backend/app/main.py
+backend/app/middleware/request_logging.py
+backend/app/middleware/security_headers.py
 ```
 
 Current cross-cutting responsibilities include:
@@ -789,7 +790,7 @@ Middleware must not contain request-specific business workflow such as asset cre
 
 **Purpose:** hold small reusable utilities that do not deserve their own Service and do not own business workflow.
 
-There is not currently a dedicated `helpers/` folder. Some helper-like logic currently lives close to the Services/Core code that uses it.
+Dedicated helper folders now contain small reusable pure utilities without owning business workflow.
 
 Future examples:
 
@@ -931,7 +932,7 @@ frontend/src/App.jsx
 
 `main.jsx` bootstraps React.
 
-`App.jsx` currently owns routing/session/application-shell behavior. Shared layout responsibilities can later be extracted into layout/shared components without changing application behavior.
+`App.jsx` owns routing/session composition. `AppLayout.jsx` and `AuthLayout.jsx` own the shared shells, while `components/shared/` contains reusable navigation, brand and footer partials.
 
 ---
 
@@ -1088,15 +1089,15 @@ POST /api/requests
   ↓
 request_controller.py                   CONTROLLER
   ↓
-schemas.py                              DTO / VALIDATION
+schemas/request_schema.py               DTO / VALIDATION
   ↓
 request_service.py                      SERVICE
   ↓
-repository.py                           REPOSITORY
+repositories/request_repository.py      REPOSITORY
   ↓
 asset_request.py + audit_log.py         MODELS
   ↓
-database.py                             DB CONTEXT
+data/db_context.py + data/session.py     DB CONTEXT
   ↓
 PostgreSQL                              DATABASE
   ↓
@@ -1130,11 +1131,11 @@ request_controller.py                   CONTROLLER
   ↓
 request_service.py                      SERVICE
   ↓
-repository.py                           REPOSITORY
+repositories/request_repository.py      REPOSITORY
   ↓
 AssetRequest Model
   ↓
-database.py / Session                   DB CONTEXT
+data/db_context.py / session.py          DB CONTEXT
   ↓
 PostgreSQL
   ↓
@@ -1196,7 +1197,7 @@ webhook_controller.py                   CONTROLLER
   ↓
 webhook_service.py                      SERVICE
   ↓
-repository/database access              REPOSITORY
+repositories/request_repository.py      REPOSITORY
   ↓
 AssetRequest + AuditLog                  MODELS
   ↓
@@ -1216,7 +1217,7 @@ updated status appears in VIEW
 ```text
 ┌────────────────────────────────────┐
 │ VIEW LAYER                         │
-│ React + Vite on Vercel             │
+│ React + Vite on Render Static Sites             │
 │                                    │
 │ RequestView                        │
 │ RequestDetailView                  │
@@ -1331,7 +1332,7 @@ The application combines it with:
 /api/webhooks/zendesk
 ```
 
-Frontend / Vercel:
+Frontend / Render Static Site:
 
 ```env
 VITE_API_URL=https://royal-tires-api.onrender.com

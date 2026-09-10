@@ -9,7 +9,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.database import utc_now
+from app.data.base import utc_now
 from app.models.asset_request import AssetRequest
 from app.models.zendesk_connection import ZendeskConnection
 

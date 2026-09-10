@@ -79,7 +79,7 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
         </div>
         <div className="field">
           <label htmlFor="requester_email">
-            Email address <span aria-hidden="true">*</span>
+            Requester email <span aria-hidden="true">*</span>
           </label>
           <input
             {...fieldProps('requester_email')}
@@ -87,7 +87,7 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
             autoComplete="email"
             maxLength={254}
             required
-            placeholder="name@royaltyres.co.za"
+            placeholder="you@company.com"
           />
           {errors.requester_email && (
             <p className="field-error" id="requester_email-error">
@@ -96,12 +96,11 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
           )}
         </div>
       </div>
-
       <div className="section-title separated">
         <span className="step">02</span>
         <div>
-          <h2>Equipment request</h2>
-          <p>Choose the asset and tell IT why it is needed.</p>
+          <h2>What do you need?</h2>
+          <p>Choose your asset and tell us how it will help.</p>
         </div>
       </div>
       <div className="field">
@@ -109,11 +108,9 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
           Asset type <span aria-hidden="true">*</span>
         </label>
         <select {...fieldProps('asset_type')} required>
-          <option value="">Choose an asset</option>
+          <option value="">Select an asset</option>
           {ASSET_TYPES.map((asset) => (
-            <option key={asset} value={asset}>
-              {asset}
-            </option>
+            <option key={asset}>{asset}</option>
           ))}
         </select>
         {errors.asset_type && (
@@ -128,31 +125,36 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
         </label>
         <textarea
           {...fieldProps('reason')}
+          rows={5}
           maxLength={1000}
           required
-          placeholder="Explain what the equipment is needed for and any urgency."
+          placeholder="Tell us why you need this asset, including any issue with your current equipment."
         />
         <div className="field-hint">
-          <span>Minimum 10 non-whitespace characters</span>
-          <span>{meaningfulCharacterCount(values.reason)}/10 meaningful</span>
+          <span>
+            {errors.reason ? (
+              <span className="field-error" id="reason-error">
+                {errors.reason}
+              </span>
+            ) : (
+              'A little context helps IT understand your request. Minimum 10 meaningful characters.'
+            )}
+          </span>
+          <span>
+            {meaningfulCharacterCount(values.reason)} meaningful · {values.reason.length}/1000 total
+          </span>
         </div>
-        {errors.reason && (
-          <p className="field-error" id="reason-error">
-            {errors.reason}
-          </p>
-        )}
       </div>
-
       {error && (
-        <p className="notice error" role="alert">
+        <div className="notice error" role="alert">
           {error}
-        </p>
+        </div>
       )}
       <div className="form-footer">
-        <span>Required fields are marked *</span>
-        <button type="submit" className="button primary" disabled={submitting}>
-          {submitting ? 'Submitting…' : 'Submit request'}{' '}
-          <span aria-hidden="true">→</span>
+        <span>All fields are required.</span>
+        <button className="button primary" disabled={submitting}>
+          {submitting ? 'Saving your request…' : 'Submit IT Asset Request'}{' '}
+          <span aria-hidden="true">↗</span>
         </button>
       </div>
     </form>
