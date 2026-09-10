@@ -3,11 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.security import require_user
 from app.database import get_db
 from app.schemas import AssetRequestCreate, AssetRequestResponse
 from app.services import request_service
 
-router = APIRouter(prefix="/api/requests", tags=["Requests"])
+router = APIRouter(prefix="/api/requests", tags=["Requests"], dependencies=[Depends(require_user)])
 Database = Annotated[Session, Depends(get_db)]
 
 
