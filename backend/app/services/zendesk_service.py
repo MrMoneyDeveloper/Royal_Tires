@@ -1,11 +1,8 @@
-import base64
-import hashlib
 import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 import httpx
-from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -84,45 +81,22 @@ def normalize_subdomain(value: str) -> str:
         raw = raw[: -len(".zendesk.com")]
     if not _SUBDOMAIN.fullmatch(raw):
         raise ZendeskError(
-            "Enter a valid Zendesk subdomain such as 'digify7' or 'digify7.zendesk.com'.",
-            400,
+            "ZENDESK_SUBDOMAIN must be a valid Zendesk subdomain such as 'digify7'.",
+            503,
         )
     return raw
 
 
-def _fernet(settings: Settings) -> Fernet:
-    secret = settings.config_encryption_key.get_secret_value()
-    if len(secret) < 16:
+def _credentials_from_settings(settings: Settings) -> ZendeskCredentials:
+    subdomain = settings.zendesk_subdomain.strip()
+    email = settings.zendesk_email.strip()
+    token = settings.zendesk_api_token.get_secret_value().strip()
+    if not subdomain or not email or not token:
         raise ZendeskError(
-            "CONFIG_ENCRYPTION_KEY is not configured on the backend.",
+            "Zendesk environment variables are incomplete. Configure ZENDESK_SUBDOMAIN, ZENDESK_EMAIL and ZENDESK_API_TOKEN on Render.",
             503,
         )
-    derived = hashlib.sha256(secret.encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(derived))
-
-
-def _encrypt_token(settings: Settings, token: str) -> str:
-    return _fernet(settings).encrypt(token.encode("utf-8")).decode("ascii")
-
-
-def _decrypt_token(settings: Settings, encrypted_token: str) -> str:
-    try:
-        return _fernet(settings).decrypt(encrypted_token.encode("ascii")).decode("utf-8")
-    except InvalidToken as exc:
-        raise ZendeskError(
-            "The stored Zendesk token can no longer be decrypted. Reconnect the Zendesk instance.",
-            503,
-        ) from exc
-
-
-def _credentials_from_connection(
-    connection: ZendeskConnection, settings: Settings
-) -> ZendeskCredentials:
-    return ZendeskCredentials(
-        subdomain=connection.subdomain,
-        email=connection.api_email,
-        token=_decrypt_token(settings, connection.encrypted_api_token),
-    )
+    return ZendeskCredentials(normalize_subdomain(subdomain), email, token)
 
 
 def _request_json(
@@ -157,7 +131,7 @@ def _request_json(
 
     if response.status_code in {401, 403}:
         raise ZendeskError(
-            "Zendesk rejected the credentials or the user lacks permission for this action.",
+            "Zendesk rejected the configured credentials or the user lacks permission for this action.",
             400,
         )
     if response.status_code >= 400:
@@ -254,11 +228,11 @@ def _ids(connection: ZendeskConnection) -> dict[str, int | None]:
 
 def is_configured(db: Session) -> bool:
     connection = get_connection(db)
-    return bool(
-        connection
-        and connection.encrypted_api_token
-        and all(getattr(connection, field) for field in ID_FIELDS[:-1])
-    )
+    return bool(connection and all(getattr(connection, field) for field in ID_FIELDS))
+
+
+def is_configured_record(connection: ZendeskConnection) -> bool:
+    return bool(all(getattr(connection, field) for field in ID_FIELDS))
 
 
 def _status(
@@ -266,9 +240,11 @@ def _status(
     plan: list[dict] | None = None,
     verification: list[dict] | None = None,
     message: str = "",
+    environment_configured: bool = True,
 ) -> dict:
     if connection is None:
         return {
+            "environment_configured": environment_configured,
             "connected": False,
             "configured": False,
             "can_configure": False,
@@ -277,9 +253,10 @@ def _status(
             "plan": [],
             "ids": None,
             "verification": verification or [],
-            "message": message or "Connect a Zendesk sandbox to build the setup plan.",
+            "message": message or "Test the Zendesk environment connection to build the setup plan.",
         }
     return {
+        "environment_configured": environment_configured,
         "connected": True,
         "configured": is_configured_record(connection),
         "can_configure": connection.connected_user_role == "admin",
@@ -296,18 +273,41 @@ def _status(
     }
 
 
-def is_configured_record(connection: ZendeskConnection) -> bool:
+def _environment_ready(settings: Settings) -> bool:
     return bool(
-        connection.encrypted_api_token
-        and all(getattr(connection, field) for field in ID_FIELDS[:-1])
+        settings.zendesk_subdomain.strip()
+        and settings.zendesk_email.strip()
+        and settings.zendesk_api_token.get_secret_value().strip()
     )
 
 
 def get_setup_status(db: Session, settings: Settings) -> dict:
+    if not _environment_ready(settings):
+        return _status(
+            None,
+            environment_configured=False,
+            message="Zendesk environment variables are not configured on the backend.",
+        )
+
     connection = get_connection(db)
     if connection is None:
-        return _status(None)
-    credentials = _credentials_from_connection(connection, settings)
+        return _status(
+            None,
+            environment_configured=True,
+            message="Zendesk credentials are present in the backend environment. Test the connection to build the dry-run plan.",
+        )
+
+    credentials = _credentials_from_settings(settings)
+    if (
+        connection.subdomain != credentials.subdomain
+        or connection.api_email.casefold() != credentials.email.casefold()
+    ):
+        return _status(
+            None,
+            environment_configured=True,
+            message="Zendesk environment values changed. Test the connection again before applying configuration.",
+        )
+
     plan = build_setup_plan(credentials)
     return _status(
         connection,
@@ -320,40 +320,33 @@ def get_setup_status(db: Session, settings: Settings) -> dict:
     )
 
 
-def connect(
-    db: Session,
-    settings: Settings,
-    subdomain: str,
-    email: str,
-    api_token: str,
-) -> dict:
-    normalized = normalize_subdomain(subdomain)
-    credentials = ZendeskCredentials(normalized, email.strip(), api_token.strip())
-    if not credentials.token:
-        raise ZendeskError("Zendesk API token is required.", 400)
+def connect(db: Session, settings: Settings) -> dict:
+    credentials = _credentials_from_settings(settings)
 
-    # Validate the login before saving anything.
+    # Validate Render-held credentials before saving any connection metadata.
     data = _request_json(credentials, "GET", "/api/v2/users/me.json")
     user = data.get("user") if isinstance(data, dict) else None
     if not isinstance(user, dict) or not isinstance(user.get("id"), int):
         raise ZendeskError("Zendesk login succeeded but returned an invalid user response.")
 
-    encrypted = _encrypt_token(settings, credentials.token)
     connection = get_connection(db)
     changed_instance = bool(
         connection
         and (
-            connection.subdomain != normalized
+            connection.subdomain != credentials.subdomain
             or connection.api_email.casefold() != credentials.email.casefold()
         )
     )
     if connection is None:
-        connection = ZendeskConnection(id=1, subdomain=normalized, api_email=credentials.email, encrypted_api_token=encrypted)
+        connection = ZendeskConnection(
+            id=1,
+            subdomain=credentials.subdomain,
+            api_email=credentials.email,
+        )
         db.add(connection)
     else:
-        connection.subdomain = normalized
+        connection.subdomain = credentials.subdomain
         connection.api_email = credentials.email
-        connection.encrypted_api_token = encrypted
 
     connection.connected_user_name = user.get("name")
     connection.connected_user_email = user.get("email")
@@ -374,7 +367,7 @@ def connect(
         connection,
         plan,
         message=(
-            "Connection verified. Review the plan and confirm before any Zendesk configuration is changed."
+            "Connection verified from backend environment variables. Review the plan and confirm before any Zendesk configuration is changed."
             if connection.connected_user_role == "admin"
             else "Connection verified, but an admin user is required to create Zendesk configuration."
         ),
@@ -524,11 +517,19 @@ def _verify_object(
 def apply_setup(db: Session, settings: Settings) -> dict:
     connection = get_connection(db)
     if connection is None:
-        raise ZendeskError("Connect and test Zendesk before applying configuration.", 400)
+        raise ZendeskError("Test the Zendesk environment connection before applying configuration.", 400)
     if connection.connected_user_role != "admin":
         raise ZendeskError("A Zendesk admin user is required to apply configuration.", 403)
 
-    credentials = _credentials_from_connection(connection, settings)
+    credentials = _credentials_from_settings(settings)
+    if (
+        connection.subdomain != credentials.subdomain
+        or connection.api_email.casefold() != credentials.email.casefold()
+    ):
+        raise ZendeskError(
+            "Zendesk environment values changed. Test the connection again before applying configuration.",
+            409,
+        )
 
     # Fresh discovery occurs before mutation. Every ensure function is idempotent:
     # it reuses an exact Royal Tyres object if one already exists and creates only
@@ -584,11 +585,16 @@ def _asset_value(asset_type: str) -> str:
 
 
 def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict:
-    """Create one Zendesk ticket using the verified configuration stored in SQL."""
+    """Create one Zendesk ticket using Render-held credentials and verified IDs."""
     connection = get_connection(db)
     if connection is None or not is_configured_record(connection):
         raise ZendeskError("Zendesk integration is not configured.", 503)
-    credentials = _credentials_from_connection(connection, settings)
+    credentials = _credentials_from_settings(settings)
+    if (
+        connection.subdomain != credentials.subdomain
+        or connection.api_email.casefold() != credentials.email.casefold()
+    ):
+        raise ZendeskError("Zendesk environment values changed. Re-test the connection.", 503)
 
     payload = {
         "ticket": {
