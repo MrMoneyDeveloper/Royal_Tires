@@ -1,4 +1,5 @@
 import StatusBadge from './StatusBadge.jsx';
+import './sync-state.css';
 
 function formatDate(value) {
   return value
