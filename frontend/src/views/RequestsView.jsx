@@ -12,11 +12,36 @@ function formatDate(value) {
     : '—';
 }
 
+function isClosed(record) {
+  return ['solved', 'closed'].includes((record.status || '').toLowerCase());
+}
+
+function matchesQuery(record, query) {
+  if (!query) return true;
+  const values = [
+    record.id,
+    record.requester_name,
+    record.requester_email,
+    record.asset_type,
+    record.status,
+    record.zendesk_ticket_id,
+    record.zendesk_status,
+    record.zendesk_sync_status,
+  ];
+  return values.some((value) =>
+    String(value ?? '')
+      .toLowerCase()
+      .includes(query),
+  );
+}
+
 export default function RequestsView({ api, navigate }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
 
   const load = useCallback(
     async ({ quiet = false } = {}) => {
@@ -40,9 +65,7 @@ export default function RequestsView({ api, navigate }) {
   }, [load]);
 
   const summary = useMemo(() => {
-    const active = records.filter(
-      (record) => !['solved', 'closed'].includes(record.status),
-    ).length;
+    const active = records.filter((record) => !isClosed(record)).length;
     const linked = records.filter((record) => record.zendesk_ticket_id).length;
     const attention = records.filter(
       (record) => record.zendesk_sync_status === 'sync_failed',
@@ -50,15 +73,27 @@ export default function RequestsView({ api, navigate }) {
     return { total: records.length, active, linked, attention };
   }, [records]);
 
+  const filteredRecords = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return records.filter((record) => {
+      const filterMatch =
+        filter === 'all' ||
+        (filter === 'active' && !isClosed(record)) ||
+        (filter === 'sync_failed' && record.zendesk_sync_status === 'sync_failed') ||
+        (filter === 'solved' && isClosed(record));
+      return filterMatch && matchesQuery(record, normalizedQuery);
+    });
+  }, [records, query, filter]);
+
   return (
     <>
       <header className="page-heading queue-heading">
         <div>
           <p className="eyebrow">SERVICE DESK</p>
-          <h1>Request queue</h1>
+          <h1>IT Service Desk Dashboard</h1>
           <p>
-            See every request stored in the portal and the Zendesk ticket currently
-            linked to it.
+            Monitor requests, linked Zendesk tickets and integration errors from one
+            place. Search by request, requester, asset or Zendesk ticket number.
           </p>
         </div>
         <button
@@ -67,11 +102,11 @@ export default function RequestsView({ api, navigate }) {
           onClick={() => load({ quiet: true })}
           disabled={refreshing}
         >
-          {refreshing ? 'Refreshing…' : 'Refresh queue'}
+          {refreshing ? 'Refreshing…' : 'Refresh dashboard'}
         </button>
       </header>
 
-      <section className="queue-summary" aria-label="Request queue summary">
+      <section className="queue-summary" aria-label="Dashboard summary">
         <div className="queue-stat">
           <span>Total requests</span>
           <strong>{summary.total}</strong>
@@ -85,18 +120,25 @@ export default function RequestsView({ api, navigate }) {
           <strong>{summary.linked}</strong>
         </div>
         <div className={`queue-stat ${summary.attention ? 'attention' : ''}`}>
-          <span>Sync attention</span>
+          <span>Sync errors</span>
           <strong>{summary.attention}</strong>
         </div>
       </section>
 
+      {summary.attention > 0 && (
+        <p className="notice error dashboard-alert" role="status">
+          {summary.attention} request{summary.attention === 1 ? '' : 's'} need sync
+          attention. Use the Sync errors filter to isolate them.
+        </p>
+      )}
+
       <section className="panel queue-panel">
         <div className="panel-heading queue-panel-heading">
           <div>
-            <h2>Incoming asset requests</h2>
+            <h2>Requests</h2>
             <p className="muted">
-              PostgreSQL is the local system of record. Zendesk linkage and sync state
-              are shown alongside each request.
+              PostgreSQL is the local system of record. Open any row to inspect the full
+              request and its Zendesk synchronisation path.
             </p>
           </div>
           <AppLink className="button primary" to="/request" navigate={navigate}>
@@ -104,12 +146,41 @@ export default function RequestsView({ api, navigate }) {
           </AppLink>
         </div>
 
+        <div className="dashboard-controls">
+          <div className="dashboard-search">
+            <label htmlFor="request-search">Search requests</label>
+            <input
+              id="request-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Request ID, name, email, asset or Zendesk ticket"
+            />
+          </div>
+          <div className="dashboard-filter">
+            <label htmlFor="request-filter">Show</label>
+            <select
+              id="request-filter"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              <option value="all">All requests</option>
+              <option value="active">Active requests</option>
+              <option value="sync_failed">Sync errors</option>
+              <option value="solved">Solved / closed</option>
+            </select>
+          </div>
+          <span className="dashboard-result-count">
+            {filteredRecords.length} of {records.length} shown
+          </span>
+        </div>
+
         {loading ? (
-          <p className="muted" role="status">
+          <p className="queue-state muted" role="status">
             Loading requests…
           </p>
         ) : error ? (
-          <div>
+          <div className="queue-state">
             <p className="notice error" role="alert">
               {error}
             </p>
@@ -121,6 +192,11 @@ export default function RequestsView({ api, navigate }) {
           <div className="queue-empty">
             <strong>No requests yet.</strong>
             <p>Create the first asset request and it will appear here.</p>
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="queue-empty">
+            <strong>No requests match this search.</strong>
+            <p>Clear the search or change the filter to see more requests.</p>
           </div>
         ) : (
           <div className="queue-table-wrap">
@@ -134,11 +210,15 @@ export default function RequestsView({ api, navigate }) {
                   <th>Zendesk ticket</th>
                   <th>Sync</th>
                   <th>Updated</th>
+                  <th aria-label="Open request" />
                 </tr>
               </thead>
               <tbody>
-                {records.map((record) => (
-                  <tr key={record.id}>
+                {filteredRecords.map((record) => (
+                  <tr
+                    key={record.id}
+                    className={record.zendesk_sync_status === 'sync_failed' ? 'queue-row-attention' : ''}
+                  >
                     <td>
                       <AppLink
                         className="queue-request-link"
@@ -170,6 +250,16 @@ export default function RequestsView({ api, navigate }) {
                       <StatusBadge status={record.zendesk_sync_status} />
                     </td>
                     <td>{formatDate(record.updated_at)}</td>
+                    <td className="queue-open-cell">
+                      <AppLink
+                        className="queue-open-link"
+                        to={`/requests/${record.id}`}
+                        navigate={navigate}
+                        aria-label={`Open request ${record.id}`}
+                      >
+                        View →
+                      </AppLink>
+                    </td>
                   </tr>
                 ))}
               </tbody>

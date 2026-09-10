@@ -1,0 +1,134 @@
+.settings-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.settings-heading > div {
+  max-width: 760px;
+}
+
+.settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.settings-card {
+  min-height: 100%;
+}
+
+.settings-user-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0 24px;
+}
+
+.settings-user-row h2,
+.settings-user-row p {
+  margin: 0;
+}
+
+.settings-user-row p {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.settings-avatar {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e5efce;
+  color: #214c3c;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.settings-detail-list {
+  border-top: 1px solid var(--border);
+}
+
+.settings-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0ea;
+  font-size: 11px;
+}
+
+.settings-detail-list span {
+  color: var(--muted);
+}
+
+.settings-detail-list strong {
+  text-align: right;
+  font-weight: 650;
+}
+
+.settings-action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.settings-integration-heading {
+  margin: 8px 0 18px;
+  padding-top: 8px;
+}
+
+.settings-integration-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.03em;
+  margin-bottom: 7px;
+}
+
+.settings-integration-heading .muted {
+  max-width: 760px;
+  font-size: 12px;
+}
+
+.account-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 5px;
+}
+
+.account-link:hover,
+.account-link.active {
+  color: #234f3c;
+  background: #eef3e8;
+}
+
+@media (max-width: 900px) {
+  .settings-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .settings-detail-list > div {
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .settings-detail-list strong {
+    text-align: left;
+  }
+
+  .settings-action-stack .button {
+    width: 100%;
+  }
+
+  .account-link {
+    padding: 4px 6px;
+  }
+}

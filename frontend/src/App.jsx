@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createApi } from './services/api.js';
 import AppLink from './components/AppLink.jsx';
 import RequestView from './views/RequestView.jsx';
 import RequestsView from './views/RequestsView.jsx';
 import RequestDetailView from './views/RequestDetailView.jsx';
-import ZendeskSetupView from './views/ZendeskSetupView.jsx';
+import SettingsView from './views/SettingsView.jsx';
 
 function Brand() {
   return (
@@ -23,7 +23,11 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [signingIn, setSigningIn] = useState(false);
-  const [requestNumber, setRequestNumber] = useState('');
+
+  const apiDocsUrl = useMemo(() => {
+    const baseUrl = import.meta.env?.VITE_API_URL;
+    return baseUrl ? `${baseUrl.replace(/\/$/, '')}/docs` : '#';
+  }, []);
 
   useEffect(() => {
     const pop = () => setPath(window.location.pathname);
@@ -136,13 +140,14 @@ export default function App() {
 
   const match = path.match(/^\/requests\/(\d+)\/?$/);
   const isNewRequest = path === '/' || path === '/request' || path === '/request/';
-  const isRequestQueue = path === '/requests' || path === '/requests/';
-  const isZendeskSetup =
-    path === '/zendesk-setup' || path === '/zendesk-setup/';
-  const breadcrumb = isZendeskSetup
-    ? 'Zendesk setup'
-    : isRequestQueue
-      ? 'Request queue'
+  const isDashboard =
+    path === '/dashboard' || path === '/dashboard/' || path === '/requests' || path === '/requests/';
+  const isSettings =
+    path === '/settings' || path === '/settings/' || path === '/zendesk-setup' || path === '/zendesk-setup/';
+  const breadcrumb = isSettings
+    ? 'Settings'
+    : isDashboard
+      ? 'Dashboard'
       : match
         ? `Request #${match[1]}`
         : 'New request';
@@ -162,45 +167,22 @@ export default function App() {
             <span aria-hidden="true">＋</span> New request
           </AppLink>
           <AppLink
-            to="/requests"
+            to="/dashboard"
             navigate={navigate}
-            className={`nav-item ${isRequestQueue || match ? 'active' : ''}`}
-            aria-current={isRequestQueue ? 'page' : undefined}
+            className={`nav-item ${isDashboard || match ? 'active' : ''}`}
+            aria-current={isDashboard ? 'page' : undefined}
           >
-            <span aria-hidden="true">≡</span> Request queue
+            <span aria-hidden="true">▦</span> Dashboard
           </AppLink>
-          <AppLink
-            to="/zendesk-setup"
-            navigate={navigate}
-            className={`nav-item ${isZendeskSetup ? 'active' : ''}`}
-            aria-current={isZendeskSetup ? 'page' : undefined}
+          <a
+            href={apiDocsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="nav-item"
           >
-            <span aria-hidden="true">↗</span> Zendesk setup
-          </AppLink>
+            <span aria-hidden="true">↗</span> API docs
+          </a>
         </nav>
-        <form
-          className="track-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (/^[1-9]\d*$/.test(requestNumber))
-              navigate(`/requests/${requestNumber}`);
-          }}
-        >
-          <label htmlFor="request-number">Track a request</label>
-          <div>
-            <input
-              id="request-number"
-              type="number"
-              min="1"
-              step="1"
-              placeholder="Request ID"
-              required
-              value={requestNumber}
-              onChange={(event) => setRequestNumber(event.target.value)}
-            />
-            <button aria-label="Find request">→</button>
-          </div>
-        </form>
         <div className="sidebar-bottom">
           <span className="small-dot" /> Built for your workday
         </div>
@@ -215,6 +197,14 @@ export default function App() {
               {username.slice(0, 1).toUpperCase()}
             </span>
             <span>{username}</span>
+            <AppLink
+              to="/settings"
+              navigate={navigate}
+              className={`account-link ${isSettings ? 'active' : ''}`}
+              aria-current={isSettings ? 'page' : undefined}
+            >
+              Settings
+            </AppLink>
             <button
               onClick={() => {
                 setApi(null);
@@ -230,10 +220,10 @@ export default function App() {
         <main className="main-content">
           {isNewRequest ? (
             <RequestView api={api} navigate={navigate} />
-          ) : isRequestQueue ? (
+          ) : isDashboard ? (
             <RequestsView api={api} navigate={navigate} />
-          ) : isZendeskSetup ? (
-            <ZendeskSetupView api={api} />
+          ) : isSettings ? (
+            <SettingsView api={api} username={username} apiDocsUrl={apiDocsUrl} />
           ) : match ? (
             <RequestDetailView
               key={match[1]}
@@ -244,8 +234,8 @@ export default function App() {
           ) : (
             <section className="panel">
               <h1>Page not found</h1>
-              <AppLink to="/requests" navigate={navigate}>
-                Go to request queue
+              <AppLink to="/dashboard" navigate={navigate}>
+                Go to dashboard
               </AppLink>
             </section>
           )}

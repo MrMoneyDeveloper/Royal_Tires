@@ -23,7 +23,7 @@ function PlanRows({ items }) {
   );
 }
 
-export default function ZendeskSetupView({ api }) {
+export default function ZendeskSetupView({ api, embedded = false }) {
   const [setup, setSetup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -94,14 +94,16 @@ export default function ZendeskSetupView({ api }) {
 
   return (
     <>
-      <div className="page-heading">
-        <p className="eyebrow">INTEGRATION SETUP</p>
-        <h1>Zendesk configuration</h1>
-        <p>
-          Inspect first, change second. This page separates Royal Tyres resources from
-          the small set of existing sandbox rules that need an explicit safety boundary.
-        </p>
-      </div>
+      {!embedded && (
+        <div className="page-heading">
+          <p className="eyebrow">INTEGRATION SETUP</p>
+          <h1>Zendesk configuration</h1>
+          <p>
+            Inspect first, change second. This page separates Royal Tyres resources from
+            the small set of existing sandbox rules that need an explicit safety boundary.
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="notice error" role="alert">

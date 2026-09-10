@@ -80,10 +80,10 @@ export default function RequestDetailView({ id, api, navigate }) {
     <>
       <AppLink
         className="text-link back-link"
-        to="/requests"
+        to="/dashboard"
         navigate={navigate}
       >
-        ← Back to request queue
+        ← Back to dashboard
       </AppLink>
       <header className="page-heading">
         <p className="eyebrow">REQUEST TRACKING</p>
