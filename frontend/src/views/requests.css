@@ -1,0 +1,175 @@
+.queue-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.queue-heading > div {
+  max-width: 720px;
+}
+
+.queue-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.queue-stat {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.queue-stat span,
+.queue-stat strong {
+  display: block;
+}
+
+.queue-stat span {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.queue-stat strong {
+  margin-top: 4px;
+  font-size: 27px;
+  line-height: 1.1;
+  color: #233b33;
+}
+
+.queue-stat.attention {
+  background: #fff7f2;
+  border-color: #edc7b8;
+}
+
+.queue-stat.attention strong {
+  color: #973d2d;
+}
+
+.queue-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.queue-panel-heading {
+  padding: 24px 26px 20px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-panel-heading p {
+  margin: 5px 0 0;
+  font-size: 11px;
+}
+
+.queue-table-wrap {
+  overflow-x: auto;
+}
+
+.queue-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.queue-table th {
+  text-align: left;
+  padding: 11px 14px;
+  background: #f8faf5;
+  color: #68766e;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-table td {
+  padding: 14px;
+  border-bottom: 1px solid #edf0ea;
+  vertical-align: middle;
+}
+
+.queue-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.queue-table tbody tr:hover {
+  background: #fbfcf8;
+}
+
+.queue-table td strong,
+.queue-table td small,
+.ticket-reference small {
+  display: block;
+}
+
+.queue-table td small,
+.ticket-reference small {
+  color: var(--muted);
+  margin-top: 2px;
+  font-size: 9px;
+}
+
+.queue-request-link {
+  display: inline-flex;
+  font-weight: 750;
+  text-decoration: none;
+  min-width: 42px;
+}
+
+.ticket-reference {
+  font-weight: 650;
+}
+
+.queue-empty {
+  padding: 45px 26px;
+  text-align: center;
+}
+
+.queue-empty p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+@media (max-width: 900px) {
+  .queue-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .queue-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .queue-heading .button {
+    align-self: flex-start;
+  }
+
+  .queue-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .queue-stat {
+    padding: 13px;
+  }
+
+  .queue-stat strong {
+    font-size: 22px;
+  }
+
+  .queue-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

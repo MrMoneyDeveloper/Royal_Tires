@@ -1,5 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './zendesk-setup.css';
+
+function PlanRows({ items }) {
+  return (
+    <div className="plan-list">
+      {items.map((item) => (
+        <div className="plan-row" key={item.key}>
+          <div>
+            <strong>{item.name}</strong>
+            <span>{item.object_type}</span>
+            {item.details ? <small>{item.details}</small> : null}
+          </div>
+          <div className="plan-result">
+            <span className={`plan-action ${item.action}`}>
+              {item.action.toUpperCase()}
+            </span>
+            {item.existing_id ? <small>#{item.existing_id}</small> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ZendeskSetupView({ api }) {
   const [setup, setSetup] = useState(null);
@@ -56,6 +78,19 @@ export default function ZendeskSetupView({ api }) {
 
   const plan = setup?.plan ?? [];
   const verification = setup?.verification ?? [];
+  const { managedPlan, safeguardPlan, counts } = useMemo(() => {
+    const safeguard = plan.filter(
+      (item) => item.object_type === 'Existing trigger safeguard',
+    );
+    const managed = plan.filter(
+      (item) => item.object_type !== 'Existing trigger safeguard',
+    );
+    const actionCounts = plan.reduce(
+      (result, item) => ({ ...result, [item.action]: (result[item.action] || 0) + 1 }),
+      {},
+    );
+    return { managedPlan: managed, safeguardPlan: safeguard, counts: actionCounts };
+  }, [plan]);
 
   return (
     <>
@@ -63,8 +98,8 @@ export default function ZendeskSetupView({ api }) {
         <p className="eyebrow">INTEGRATION SETUP</p>
         <h1>Zendesk configuration</h1>
         <p>
-          Credentials stay in the Render backend environment. Test the connection,
-          inspect the live Zendesk configuration, then approve only the exact plan shown.
+          Inspect first, change second. This page separates Royal Tyres resources from
+          the small set of existing sandbox rules that need an explicit safety boundary.
         </p>
       </div>
 
@@ -87,7 +122,7 @@ export default function ZendeskSetupView({ api }) {
           </div>
 
           <p className="muted setup-copy">
-            Zendesk credentials and the status-sync secret are server-side in Render.
+            Zendesk credentials and the status-sync secret stay server-side in Render.
             The browser never receives the API token or webhook secret.
           </p>
 
@@ -162,26 +197,55 @@ export default function ZendeskSetupView({ api }) {
                   'This plan is read-only. No Zendesk configuration changes until you confirm below.'}
               </p>
 
-              <div className="plan-list" aria-label="Zendesk configuration plan">
-                {plan.map((item) => (
-                  <div className="plan-row" key={item.key}>
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>{item.object_type}</span>
-                      {item.details ? <small>{item.details}</small> : null}
-                    </div>
-                    <div className="plan-result">
-                      <span className={`plan-action ${item.action}`}>
-                        {item.action.toUpperCase()}
-                      </span>
-                      {item.existing_id ? <small>#{item.existing_id}</small> : null}
-                    </div>
-                  </div>
-                ))}
+              <div className="change-boundary">
+                <strong>Change boundary</strong>
+                <p>
+                  Royal Tyres-owned resources may be created or reused. Existing sandbox
+                  triggers are only changed when they appear in the safeguard section,
+                  and the only allowed edit is <b>Brand IS NOT Royal Tyres</b>. No unrelated
+                  trigger actions, titles, active states or conditions are intentionally removed.
+                </p>
+                <div className="plan-counts" aria-label="Plan action counts">
+                  <span><b>{counts.create || 0}</b> create</span>
+                  <span><b>{counts.reuse || 0}</b> reuse</span>
+                  <span><b>{counts.update || 0}</b> update</span>
+                  <span><b>{counts.skip || 0}</b> skip</span>
+                </div>
               </div>
 
+              <div className="plan-section">
+                <div className="plan-section-heading">
+                  <div>
+                    <span className="plan-section-number">A</span>
+                    <div>
+                      <strong>Managed Royal Tyres configuration</strong>
+                      <small>Brand, group, fields, form, view, notification target, webhook and project triggers.</small>
+                    </div>
+                  </div>
+                </div>
+                <PlanRows items={managedPlan} />
+              </div>
+
+              {safeguardPlan.length > 0 && (
+                <div className="plan-section safeguard-section">
+                  <div className="plan-section-heading">
+                    <div>
+                      <span className="plan-section-number">B</span>
+                      <div>
+                        <strong>Existing sandbox safeguards</strong>
+                        <small>
+                          These rules already existed. UPDATE adds only the Royal Tyres brand exclusion; REUSE means it is already protected; SKIP means the named rule is absent.
+                        </small>
+                      </div>
+                    </div>
+                    <span className="existing-warning">Existing configuration</span>
+                  </div>
+                  <PlanRows items={safeguardPlan} />
+                </div>
+              )}
+
               {setup.plan_fingerprint && (
-                <p className="muted setup-copy">
+                <p className="muted setup-copy plan-reference">
                   Reviewed plan ref: <code>{setup.plan_fingerprint.slice(0, 12)}</code>.
                   If Zendesk changes before deployment, the backend refuses the apply
                   and requires a fresh review.
@@ -195,9 +259,9 @@ export default function ZendeskSetupView({ api }) {
                   onChange={(event) => setConfirmed(event.target.checked)}
                 />
                 <span>
-                  I reviewed this exact dry-run plan. Create only the missing Royal
-                  Tyres configuration, email notification target, webhook and triggers,
-                  and do not delete unrelated Zendesk data.
+                  I reviewed this exact dry-run plan. Apply only the listed Royal Tyres
+                  resources and listed safeguard updates, preserve unrelated Zendesk
+                  configuration, and do not delete unrelated data.
                 </span>
               </label>
 
@@ -247,6 +311,10 @@ export default function ZendeskSetupView({ api }) {
         <section className="panel verification-panel">
           <p className="eyebrow">03 · VERIFY AFTER</p>
           <h2>Zendesk configuration verification</h2>
+          <p className="muted setup-copy">
+            PASS means the backend read the object back after Apply and confirmed the
+            expected managed configuration or safeguard is present.
+          </p>
           <div className="verification-grid">
             {verification.map((item) => (
               <div className="verification-item" key={`${item.object_type}-${item.id}`}>

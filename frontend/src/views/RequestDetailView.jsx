@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import SyncStatePanel from '../components/SyncStatePanel.jsx';
 
 export function formatDate(value) {
   return value
@@ -59,8 +60,8 @@ export default function RequestDetailView({ id, api, navigate }) {
         if (active) setLoading(false);
       });
 
-    // Once Zendesk is linked, silently refresh so a status change made by an
-    // agent appears on the tracking page without a browser reload.
+    // The browser only polls our API. Zendesk status itself arrives through the
+    // authenticated server-side webhook and is persisted before this view reads it.
     const timer = window.setInterval(() => {
       if (active) {
         api.getRequest(id).then((value) => {
@@ -79,15 +80,15 @@ export default function RequestDetailView({ id, api, navigate }) {
     <>
       <AppLink
         className="text-link back-link"
-        to="/request"
+        to="/requests"
         navigate={navigate}
       >
-        ← Back to new request
+        ← Back to request queue
       </AppLink>
       <header className="page-heading">
         <p className="eyebrow">REQUEST TRACKING</p>
         <h1>Request #{id}</h1>
-        <p>Your equipment request and its latest progress.</p>
+        <p>Your equipment request, Zendesk link and latest synchronized status.</p>
       </header>
       {loading ? (
         <div className="panel" role="status">
@@ -98,10 +99,7 @@ export default function RequestDetailView({ id, api, navigate }) {
           <p className="notice error" role="alert">
             {error}
           </p>
-          <button
-            className="button secondary"
-            onClick={() => fetchRecord()}
-          >
+          <button className="button secondary" onClick={() => fetchRecord()}>
             Try again
           </button>
         </div>
@@ -136,56 +134,11 @@ export default function RequestDetailView({ id, api, navigate }) {
                 <p>{record.reason}</p>
               </div>
             </section>
-            <section className="panel">
-              <p className="eyebrow">HELPDESK CONNECTION</p>
-              <div className="panel-heading">
-                <h2>Zendesk synchronisation</h2>
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => fetchRecord({ quiet: true })}
-                  disabled={refreshing}
-                >
-                  {refreshing ? 'Refreshing…' : 'Refresh status'}
-                </button>
-              </div>
-              <dl className="stacked-details">
-                <div>
-                  <dt>Ticket</dt>
-                  <dd>
-                    {record.zendesk_ticket_id
-                      ? `#${record.zendesk_ticket_id}`
-                      : 'Awaiting ticket creation'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Zendesk status</dt>
-                  <dd>
-                    <StatusBadge status={record.zendesk_status} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Sync state</dt>
-                  <dd>
-                    <StatusBadge status={record.zendesk_sync_status} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Last successful sync</dt>
-                  <dd>{formatDate(record.zendesk_last_synced_at)}</dd>
-                </div>
-              </dl>
-              {record.zendesk_ticket_id ? (
-                <p className="muted">
-                  Zendesk status changes are pushed back to this portal. This page also
-                  checks for fresh data every 10 seconds while it is open.
-                </p>
-              ) : (
-                <p className="muted">
-                  Your request is saved. Ticket creation is pending.
-                </p>
-              )}
-            </section>
+            <SyncStatePanel
+              record={record}
+              refreshing={refreshing}
+              onRefresh={() => fetchRecord({ quiet: true })}
+            />
           </div>
         )
       )}
