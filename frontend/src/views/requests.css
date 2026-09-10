@@ -6,7 +6,7 @@
 }
 
 .queue-heading > div {
-  max-width: 720px;
+  max-width: 760px;
 }
 
 .queue-summary {
@@ -52,6 +52,10 @@
   color: #973d2d;
 }
 
+.dashboard-alert {
+  margin-bottom: 20px;
+}
+
 .queue-panel {
   padding: 0;
   overflow: hidden;
@@ -68,13 +72,60 @@
   font-size: 11px;
 }
 
+.dashboard-controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(170px, 220px) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px 26px;
+  border-bottom: 1px solid var(--border);
+  background: #fbfcf8;
+}
+
+.dashboard-search,
+.dashboard-filter {
+  min-width: 0;
+}
+
+.dashboard-search label,
+.dashboard-filter label {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.dashboard-search input,
+.dashboard-filter select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d6ded3;
+  border-radius: 6px;
+  background: #fff;
+  color: #233b33;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.dashboard-result-count {
+  color: var(--muted);
+  font-size: 10px;
+  padding-bottom: 10px;
+  white-space: nowrap;
+}
+
+.queue-state {
+  padding: 26px;
+}
+
 .queue-table-wrap {
   overflow-x: auto;
 }
 
 .queue-table {
   width: 100%;
-  min-width: 900px;
+  min-width: 980px;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -104,6 +155,10 @@
   background: #fbfcf8;
 }
 
+.queue-table tbody tr.queue-row-attention {
+  background: #fffaf7;
+}
+
 .queue-table td strong,
 .queue-table td small,
 .ticket-reference small {
@@ -128,6 +183,19 @@
   font-weight: 650;
 }
 
+.queue-open-cell {
+  text-align: right;
+}
+
+.queue-open-link {
+  display: inline-block;
+  color: #234f3c;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .queue-empty {
   padding: 45px 26px;
   text-align: center;
@@ -137,6 +205,17 @@
   color: var(--muted);
   font-size: 12px;
   margin: 6px 0 0;
+}
+
+@media (max-width: 1000px) {
+  .dashboard-controls {
+    grid-template-columns: 1fr 190px;
+  }
+
+  .dashboard-result-count {
+    grid-column: 1 / -1;
+    padding: 0;
+  }
 }
 
 @media (max-width: 900px) {
@@ -171,5 +250,14 @@
   .queue-panel-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .dashboard-controls {
+    grid-template-columns: 1fr;
+    padding: 14px 18px;
+  }
+
+  .dashboard-result-count {
+    grid-column: auto;
   }
 }
