@@ -46,6 +46,7 @@ class ZendeskPlanItem(BaseModel):
     name: str
     action: Literal["create", "reuse"]
     existing_id: int | str | None = None
+    details: str | None = None
 
 
 class ZendeskUserSummary(BaseModel):
@@ -57,6 +58,7 @@ class ZendeskUserSummary(BaseModel):
 class ZendeskSetupStatus(BaseModel):
     environment_configured: bool = False
     workflow_environment_ready: bool = False
+    notification_email: str | None = None
     connected: bool
     configured: bool
     can_configure: bool
