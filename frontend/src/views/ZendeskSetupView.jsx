@@ -26,21 +26,12 @@ export default function ZendeskSetupView({ api }) {
     load();
   }, []);
 
-  async function connect(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fields = new FormData(form);
+  async function connect() {
     setConnecting(true);
     setConfirmed(false);
     setError('');
     try {
-      const result = await api.connectZendesk({
-        subdomain: fields.get('subdomain'),
-        email: fields.get('email'),
-        api_token: fields.get('api_token'),
-      });
-      setSetup(result);
-      form.elements.api_token.value = '';
+      setSetup(await api.connectZendesk());
     } catch (problem) {
       setError(problem.message);
     } finally {
@@ -70,10 +61,10 @@ export default function ZendeskSetupView({ api }) {
     <>
       <div className="page-heading">
         <p className="eyebrow">INTEGRATION SETUP</p>
-        <h1>Connect Zendesk</h1>
+        <h1>Zendesk configuration</h1>
         <p>
-          Test the sandbox login, inspect existing configuration, then apply only
-          the missing Royal Tyres objects after confirmation.
+          Credentials stay in the Render backend environment. Test the connection,
+          inspect the live Zendesk configuration, then approve only the exact plan shown.
         </p>
       </div>
 
@@ -88,7 +79,7 @@ export default function ZendeskSetupView({ api }) {
           <div className="zendesk-panel-heading">
             <div>
               <p className="eyebrow">01 · CONNECTION</p>
-              <h2>Zendesk sandbox login</h2>
+              <h2>Backend environment</h2>
             </div>
             <span className={`setup-chip ${setup?.connected ? 'ok' : ''}`}>
               {setup?.connected ? 'Connected' : 'Not connected'}
@@ -96,48 +87,32 @@ export default function ZendeskSetupView({ api }) {
           </div>
 
           <p className="muted setup-copy">
-            The API token is sent to the FastAPI backend over HTTPS, encrypted
-            server-side, and never returned to the browser.
+            Zendesk domain, API email and API token are configured server-side in
+            Render. The browser never receives or stores the Zendesk API token.
           </p>
 
-          <form onSubmit={connect}>
-            <div className="field">
-              <label htmlFor="zendesk-subdomain">Zendesk domain or subdomain</label>
-              <input
-                id="zendesk-subdomain"
-                name="subdomain"
-                placeholder="digify7 or digify7.zendesk.com"
-                required
-                autoComplete="off"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="zendesk-email">Zendesk admin email</label>
-              <input
-                id="zendesk-email"
-                name="email"
-                type="email"
-                placeholder="admin@example.com"
-                required
-                autoComplete="username"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="zendesk-token">API token</label>
-              <input
-                id="zendesk-token"
-                name="api_token"
-                type="password"
-                placeholder="Paste the active API token"
-                required
-                autoComplete="new-password"
-              />
-            </div>
-            <button className="button primary" disabled={connecting}>
-              {connecting ? 'Testing connection…' : 'Test & connect'}
+          <div className="connection-summary" aria-live="polite">
+            <strong>
+              {setup?.environment_configured
+                ? 'Zendesk environment variables detected'
+                : 'Zendesk environment variables missing'}
+            </strong>
+            <span>ZENDESK_SUBDOMAIN</span>
+            <span>ZENDESK_EMAIL</span>
+            <span>ZENDESK_API_TOKEN · hidden server-side</span>
+          </div>
+
+          <div className="action-row">
+            <button
+              type="button"
+              className="button primary"
+              disabled={connecting || !setup?.environment_configured}
+              onClick={connect}
+            >
+              {connecting ? 'Testing environment connection…' : 'Test environment connection'}
               <span aria-hidden="true">→</span>
             </button>
-          </form>
+          </div>
 
           {setup?.connected && (
             <div className="connection-summary" aria-live="polite">
@@ -146,6 +121,13 @@ export default function ZendeskSetupView({ api }) {
               <span>{setup.user?.email}</span>
               <span>Role: {setup.user?.role || 'unknown'}</span>
             </div>
+          )}
+
+          {!loading && setup && !setup.environment_configured && (
+            <p className="notice error">
+              Add ZENDESK_SUBDOMAIN, ZENDESK_EMAIL and ZENDESK_API_TOKEN to the Render
+              web service environment, save, and let the backend restart.
+            </p>
           )}
         </section>
 
@@ -161,11 +143,11 @@ export default function ZendeskSetupView({ api }) {
           </div>
 
           {loading ? (
-            <p className="muted">Checking saved Zendesk configuration…</p>
+            <p className="muted">Checking Zendesk setup state…</p>
           ) : !setup?.connected ? (
             <p className="muted">
-              Connect Zendesk first. Nothing is created or changed during the
-              connection test.
+              Test the environment connection first. That operation is read-only and
+              does not create or change Zendesk configuration.
             </p>
           ) : (
             <>
@@ -239,8 +221,8 @@ export default function ZendeskSetupView({ api }) {
 
               {!setup.can_configure && (
                 <p className="notice error">
-                  The connected Zendesk user is not an admin. An admin login is
-                  required to create brands, groups, fields and forms.
+                  The configured Zendesk user is not an admin. An admin API identity is
+                  required to create brands, groups, fields, forms and views.
                 </p>
               )}
             </>
