@@ -25,10 +25,12 @@ def require_user(
     request: Request,
     credentials: Annotated[HTTPBasicCredentials | None, Depends(basic_auth)],
 ) -> str:
+    # main.py stored core/config.py's typed runtime settings; credentials come from the host, not route data.
     settings = request.app.state.settings
     password = settings.app_password.get_secret_value()
     if not settings.app_username or not password:
         raise HTTPException(503, "Demo authentication is not configured.")
+    # Compare credentials without ordinary early-exit equality; only authenticated calls continue into Controllers.
     username_ok = secrets.compare_digest(
         (credentials.username if credentials else "").encode(), settings.app_username.encode()
     )

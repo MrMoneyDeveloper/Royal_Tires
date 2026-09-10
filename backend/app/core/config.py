@@ -22,6 +22,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # BaseSettings loads runtime environment values, with .env for local use; main.py passes typed settings to other layers.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./asset_requests.db"
@@ -64,6 +65,7 @@ class Settings(BaseSettings):
         return value
 
     @property
+    # main.py passes these validated origins to CORS middleware; they do not replace Basic Auth.
     def allowed_origins(self) -> list[str]:
         return [
             part.strip().rstrip("/")

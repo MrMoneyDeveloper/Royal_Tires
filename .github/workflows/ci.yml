@@ -1,16 +1,19 @@
 name: CI
 
+# Validate PRs targeting main and pushes to main; these events do not themselves deploy to Render.
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
 
+# CI is validation; Render separately auto-deploys main. No Render deployment command runs in this workflow.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Independently install Python dependencies and verify backend behavior on an Ubuntu runner.
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -31,9 +34,11 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      # pytest checks API/auth/validation, persistence, failure isolation and mocked Zendesk/webhook flows.
       - name: Run backend tests
         run: python -m pytest
 
+  # Verify frontend logic, production compilation and browser behavior in a separate Node job.
   frontend:
     name: Frontend tests and build
     runs-on: ubuntu-latest
@@ -54,14 +59,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Node unit tests check api.js request/error handling and pure input validation helpers.
       - name: Run frontend unit tests
         run: npm test
 
+      # Vite proves imports/JSX/assets compile into a production bundle; it does not prove live integrations.
       - name: Build frontend
         run: npm run build
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      # Playwright exercises desktop/mobile UI flows with intercepted API responses, not the live sandbox.
       - name: Run browser tests
         run: npm run test:e2e

@@ -55,6 +55,7 @@ export default function DashboardView({ api, navigate }) {
       else setLoading(true);
       setError('');
       try {
+        // services/api.js reads request_controller.py; these local request DTOs drive display/filtering, not Zendesk calls.
         setRecords(await api.listRequests(100, 0));
       } catch (problem) {
         setError(problem.message);

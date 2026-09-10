@@ -113,6 +113,7 @@ export default function App() {
     setSigningIn(true);
     setError('');
     try {
+      // services/api.js creates the in-memory HTTP client; Views receive this client instead of credentials.
       const nextApi = createApi(
         { username: fields.get('username'), password: fields.get('password') },
         {
@@ -122,6 +123,7 @@ export default function App() {
           },
         },
       );
+      // api.js probes request_controller.py's protected GET; only a successful response enables authenticated Views.
       await nextApi.listRequests(1);
       setUsername(fields.get('username'));
       setApi(nextApi);
@@ -203,6 +205,7 @@ export default function App() {
         ? `Request #${match[1]}`
         : 'New request';
 
+  // Route browser paths to views/*.jsx; App composes pages while Services own business and HTTP work.
   let page;
   if (isNewRequest) {
     page = <RequestView api={api} navigate={navigate} />;

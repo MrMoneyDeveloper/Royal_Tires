@@ -50,6 +50,7 @@ export default function ZendeskSetupView({ api, embedded = false }) {
     setConfirmed(false);
     setError('');
     try {
+      // services/api.js asks zendesk_controller.py for the dry-run DTO; loading a plan does not apply it.
       setSetup(await api.getZendeskSetup());
     } catch (problem) {
       setError(problem.message);
@@ -67,6 +68,7 @@ export default function ZendeskSetupView({ api, embedded = false }) {
     setConfirmed(false);
     setError('');
     try {
+      // services/api.js asks zendesk_controller.py to test server-held credentials; only safe metadata comes back.
       setSetup(await api.connectZendesk());
     } catch (problem) {
       setError(problem.message);
@@ -80,6 +82,7 @@ export default function ZendeskSetupView({ api, embedded = false }) {
     setApplying(true);
     setError('');
     try {
+      // services/api.js submits the reviewed fingerprint; zendesk_controller.py rejects drift or returns verification.
       setSetup(await api.applyZendeskSetup(setup.plan_fingerprint));
       setConfirmed(false);
     } catch (problem) {

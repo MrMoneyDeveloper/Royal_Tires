@@ -22,6 +22,7 @@ class ZendeskStatusWebhook(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     event: Literal["status_changed"] = "status_changed"
+    # webhook_service.py uses this external ticket ID for lookup, then checks external_id when supplied.
     ticket_id: int = Field(gt=0)
     external_id: str | None = Field(default=None, max_length=150)
     status: ZendeskTicketStatus

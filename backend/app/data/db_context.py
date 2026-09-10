@@ -20,6 +20,7 @@ def create_db_engine(database_url: str):
         database_url = "postgresql+psycopg://" + database_url.split("://", 1)[1]
 
     sqlite = database_url.startswith("sqlite:")
+    # SQLAlchemy owns the driver/pool; data/session.py binds Sessions to this Engine rather than opening per-repository connections.
     engine = create_engine(
         database_url,
         connect_args={"check_same_thread": False} if sqlite else {},

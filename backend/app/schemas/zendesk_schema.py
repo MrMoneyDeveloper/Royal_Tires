@@ -21,6 +21,7 @@ class ZendeskApplyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirm: bool
+    # Validate hash shape here; zendesk_controller.py compares it with a freshly discovered plan before apply.
     plan_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 

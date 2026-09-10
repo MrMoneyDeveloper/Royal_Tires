@@ -18,6 +18,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.types import TypeDecorator
 
 
+# Models inherit this registry; main.py uses its metadata to create missing tables at startup.
 class Base(DeclarativeBase):
     """Declarative base shared by all persisted models."""
 
@@ -36,5 +37,6 @@ class UTCDateTime(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         if value is not None and value.tzinfo is None:
+            # Restore SQLite's missing timezone before ORM values reach response schemas and frontend date helpers.
             return value.replace(tzinfo=timezone.utc)
         return value

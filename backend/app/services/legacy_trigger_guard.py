@@ -210,6 +210,7 @@ def apply_exclusions(settings: Settings, brand_id: int) -> list[dict]:
                 f"Zendesk trigger '{title}' did not provide a numeric ID.", 502
             )
 
+        # zendesk_service.py re-reads the exact remote trigger so identity and drift checks precede mutation.
         live = zendesk_service._request_json(
             credentials, "GET", f"/api/v2/triggers/{trigger_id}.json"
         ).get("trigger")
@@ -250,6 +251,7 @@ def apply_exclusions(settings: Settings, brand_id: int) -> list[dict]:
             credentials, "GET", f"/api/v2/triggers/{trigger_id}.json"
         ).get("trigger")
 
+        # Compare the Zendesk read-back with the snapshot; report PASS only if other protected properties survived.
         ok = isinstance(updated, dict) and _unchanged_except_exclusion(
             original, updated, brand_id
         )

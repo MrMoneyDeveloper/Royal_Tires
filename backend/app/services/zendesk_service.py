@@ -124,6 +124,7 @@ def normalize_subdomain(value: str) -> str:
 def _credentials_from_settings(settings: Settings) -> ZendeskCredentials:
     subdomain = settings.zendesk_subdomain.strip()
     email = settings.zendesk_email.strip()
+    # Unwrap core/config.py's server-only secret for the HTTP boundary; never return it in setup DTOs.
     token = settings.zendesk_api_token.get_secret_value().strip()
     if not subdomain or not email or not token:
         raise ZendeskError(
@@ -214,6 +215,7 @@ def _request_json(
         url = base + path_or_url
 
     try:
+        # Cross the external boundary to Zendesk REST; callers receive parsed data or a safe ZendeskError.
         response = httpx.request(
             method,
             url,
@@ -238,6 +240,7 @@ def _request_json(
         basic_value = base64.b64encode(
             f"{credentials.email}/token:{credentials.token}".encode()
         ).decode()
+        # Sanitize upstream validation details before they reach logs or zendesk_controller.py's HTTP error response.
         detail = _safe_zendesk_error(
             response, (credentials.token, basic_value, *_payload_secrets(payload))
         )
@@ -396,6 +399,7 @@ def build_setup_plan(credentials: ZendeskCredentials, settings: Settings) -> lis
 
 
 def get_connection(db: Session) -> ZendeskConnection | None:
+    # repositories/zendesk_repository.py reads the local metadata Model using the shared Session, not external HTTP.
     return zendesk_repository.get_connection(db)
 
 
@@ -526,6 +530,7 @@ def get_setup_status(db: Session, settings: Settings) -> dict:
 
 def connect(db: Session, settings: Settings) -> dict:
     credentials = _credentials_from_settings(settings)
+    # Test the configured Zendesk identity with a read-only REST call before storing safe connection metadata.
     data = _request_json(credentials, "GET", "/api/v2/users/me.json")
     user = data.get("user") if isinstance(data, dict) else None
     if not isinstance(user, dict) or not isinstance(user.get("id"), int):
@@ -541,6 +546,7 @@ def connect(db: Session, settings: Settings) -> dict:
     )
     if connection is None:
         connection = ZendeskConnection(id=1, subdomain=credentials.subdomain, api_email=credentials.email)
+        # repositories/zendesk_repository.py stages models/zendesk_connection.py; this Service owns the commit.
         zendesk_repository.add_connection(db, connection)
     else:
         connection.subdomain = credentials.subdomain
@@ -876,6 +882,7 @@ def apply_setup(db: Session, settings: Settings) -> dict:
     status_email_trigger_id = _ensure_trigger(credentials, _status_email_trigger(email_target_id))
     status_sync_trigger_id = _ensure_trigger(credentials, _status_sync_trigger(webhook_id))
 
+    # Read managed IDs back through Zendesk REST; only verified IDs are saved for subsequent ticket creation.
     verification = [
         _verify_object(credentials, "Brand", brand_id, f"/api/v2/brands/{brand_id}.json", "brand"),
         _verify_object(credentials, "Group", group_id, f"/api/v2/groups/{group_id}.json", "group"),
@@ -891,6 +898,7 @@ def apply_setup(db: Session, settings: Settings) -> dict:
         _verify_object(credentials, "Status sync trigger", status_sync_trigger_id, f"/api/v2/triggers/{status_sync_trigger_id}.json", "trigger"),
     ]
     if not all(item["ok"] for item in verification):
+        # Roll back local metadata only; SQL rollback cannot undo resources already created in Zendesk.
         db.rollback()
         raise ZendeskError("Zendesk configuration was applied but post-change verification failed.")
 
@@ -902,6 +910,7 @@ def apply_setup(db: Session, settings: Settings) -> dict:
     connection.ticket_form_id = ticket_form_id
     connection.view_id = view_id
     connection.configured_at = utc_now()
+    # Persist verified remote identifiers through the Data Session; future requests reuse this local metadata.
     connection.verified_at = utc_now()
     db.commit()
     db.refresh(connection)
@@ -942,6 +951,7 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
                 "public": False,
             },
             "requester": {"name": record.requester_name, "email": record.requester_email},
+            # helpers/request_identity.py correlates this ticket with the committed local ID; it is not encryption.
             "external_id": build_external_id(record.id),
             "brand_id": connection.brand_id,
             "group_id": connection.group_id,
@@ -956,8 +966,10 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
         }
     }
 
+    # Send the committed request to Zendesk; request_service.py handles errors without losing the local record.
     data = _request_json(credentials, "POST", "/api/v2/tickets.json", payload)
     ticket = data.get("ticket") if isinstance(data, dict) else None
     if not isinstance(ticket, dict) or not isinstance(ticket.get("id"), int):
         raise ZendeskError("Zendesk returned an invalid ticket response.")
+    # Return Zendesk's ID/status to request_service.py for the second local commit and audit entry.
     return ticket

@@ -18,10 +18,12 @@ from sqlalchemy.orm import sessionmaker
 
 def create_session_factory(engine):
     """Create the scoped SQLAlchemy session factory for FastAPI dependencies."""
+    # main.py stores this factory; each get_db call creates a Session sharing the configured Engine.
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def get_db(request: Request):
     """Yield one database session for the lifetime of an HTTP request."""
+    # Yield one Session through Controller -> Service -> Repository; context exit releases it and rolls back uncommitted work.
     with request.app.state.session_factory() as session:
         yield session

@@ -17,8 +17,10 @@ from app.models.zendesk_connection import ZendeskConnection
 
 
 def get_connection(db: Session) -> ZendeskConnection | None:
+    # models/zendesk_connection.py stores singleton metadata at local ID 1; this is a database read, not Zendesk HTTP.
     return db.get(ZendeskConnection, 1)
 
 
 def add_connection(db: Session, connection: ZendeskConnection) -> None:
+    # Stage safe metadata using the injected Session; zendesk_service.py commits after its workflow checks.
     db.add(connection)

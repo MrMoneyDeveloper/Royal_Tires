@@ -15,6 +15,7 @@ import logging
 
 
 def configure_logging() -> None:
+    # main.py calls this once at startup so Services and middleware share the same log format.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",

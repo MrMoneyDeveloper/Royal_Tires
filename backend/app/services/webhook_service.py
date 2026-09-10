@@ -37,19 +37,23 @@ def apply_zendesk_status(
     db: Session, event: ZendeskStatusWebhook
 ) -> tuple[AssetRequest, bool]:
     """Apply one authenticated Zendesk status event idempotently."""
+    # repositories/request_repository.py finds the local AssetRequest by its stored Zendesk ticket ID.
     record = request_repository.get_by_zendesk_ticket_id(db, event.ticket_id)
     if record is None:
         raise WebhookRequestNotFound()
 
+    # helpers/request_identity.py rebuilds the expected correlation ID; reject a supplied mismatch before updates.
     if event.external_id and event.external_id != build_external_id(record.id):
         raise WebhookIdentityMismatch()
 
     changed = record.zendesk_status != event.status or record.status != event.status
+    # Update the Session-tracked Model only after correlation succeeds; ORM persistence happens at commit below.
     record.zendesk_status = event.status
     record.status = event.status
     record.zendesk_sync_status = "synced"
     record.zendesk_last_synced_at = utc_now()
 
+    # repositories/audit_repository.py stages the status-change or duplicate-receipt event alongside the Model.
     audit_repository.add_audit(
         db,
         record.id,
@@ -61,6 +65,7 @@ def apply_zendesk_status(
             else f"Duplicate Zendesk status event received for ticket {event.ticket_id}."
         ),
     )
+    # The Data Session commits status and AuditLog atomically to hosted PostgreSQL (SQLite in local tests).
     db.commit()
     db.refresh(record)
     logger.info(

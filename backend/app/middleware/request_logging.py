@@ -22,8 +22,10 @@ def register_request_logging(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def log_request(request: Request, call_next):
+        # Continue through FastAPI dependencies and the matched Controller; its response comes back through this middleware.
         response = await call_next(request)
         route = request.scope.get("route")
+        # On the return path, log method/route/status only; never copy Authorization headers or request bodies.
         logging.getLogger("app.http").info(
             "method=%s route=%s status=%s",
             request.method,
