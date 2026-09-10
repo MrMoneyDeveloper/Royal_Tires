@@ -18,12 +18,12 @@ test.beforeEach(async ({ page }) => {
         ...request.postDataJSON(),
         id: 27,
         status: 'new',
-        zendesk_ticket_id: null,
-        zendesk_status: null,
-        zendesk_sync_status: 'sync_pending',
-        zendesk_last_synced_at: null,
+        zendesk_ticket_id: 54,
+        zendesk_status: 'new',
+        zendesk_sync_status: 'synced',
+        zendesk_last_synced_at: '2026-09-10T10:00:05Z',
         created_at: '2026-09-10T10:00:00Z',
-        updated_at: '2026-09-10T10:00:00Z',
+        updated_at: '2026-09-10T10:00:05Z',
       };
       return route.fulfill({ status: 201, json: saved });
     }
@@ -42,7 +42,7 @@ async function signIn(page) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-test('login, validation, safe request tracking, and session logout', async ({
+test('login, validation, queue visibility, safe tracking, and logout', async ({
   page,
 }, testInfo) => {
   await page.goto('/request');
@@ -70,12 +70,20 @@ test('login, validation, safe request tracking, and session logout', async ({
   await page.getByLabel('Business reason').fill(reason);
   await page.getByRole('button', { name: 'Submit IT Asset Request' }).click();
   await expect(page.getByText('Request successfully saved.')).toBeVisible();
-  await expect(
-    page.getByText(/Zendesk synchronisation is pending/),
-  ).toBeVisible();
-  await page.getByRole('link', { name: 'Track this request' }).click();
+
+  await page.getByRole('link', { name: /Request queue/ }).click();
+  await expect(page).toHaveURL(/\/requests$/);
+  await expect(page.getByRole('heading', { name: 'Request queue' })).toBeVisible();
+  await expect(page.getByText('Incoming asset requests')).toBeVisible();
+  await expect(page.getByRole('link', { name: '#27' })).toBeVisible();
+  await expect(page.getByText('#54')).toBeVisible();
+  await expect(page.getByText('Zendesk linked')).toBeVisible();
+
+  await page.getByRole('link', { name: '#27' }).click();
   await expect(page).toHaveURL(/\/requests\/27$/);
   await expect(page.getByText(reason, { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Zendesk ticket #54' })).toBeVisible();
+  await expect(page.getByText(/Webhook → portal/)).toBeVisible();
   expect(await page.evaluate(() => window.xss)).toBeUndefined();
   expect(
     await page.evaluate(
