@@ -1,0 +1,10 @@
+flowchart TD
+    U[User] --> F[React / Vite on Render Static Site]
+    F -->|HTTPS / JSON / Basic Auth| B[FastAPI on Render]
+    B --> DB[(Render PostgreSQL)]
+    DB --- Tables[asset_requests / audit_logs / zendesk_connection]
+    B --> Z[Zendesk REST API]
+    Z --> T[Zendesk status-change Trigger]
+    T --> W[Webhook POST JSON with separate Bearer auth]
+    W --> E[FastAPI webhook endpoint]
+    E --> DB

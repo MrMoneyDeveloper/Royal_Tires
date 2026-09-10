@@ -1,0 +1,12 @@
+flowchart TD
+    Login[Login / AuthLayout] --> API[api.js Basic Auth probe to FastAPI]
+    API -->|401| Login
+    API -->|success| Shell[App.jsx route composition / AppLayout]
+    Shell --> Request[RequestView / AssetRequestForm]
+    Shell --> Dashboard[DashboardView: list / search / filter]
+    Shell --> Settings[SettingsView: account / developer tools / ZendeskSetupView]
+    Request -->|created request| Detail[RequestDetailView]
+    Dashboard -->|select row| Detail
+    Detail --> State[Local status / Zendesk status / sync state via api.js]
+    Settings --> Swagger[FastAPI /docs]
+    Settings --> Setup[Governed setup through api.js]

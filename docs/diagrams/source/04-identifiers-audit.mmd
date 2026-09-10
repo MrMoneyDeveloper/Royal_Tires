@@ -1,0 +1,7 @@
+flowchart LR
+    A[AssetRequest: local id = 6] -->|stores external ticket ID| Z[Zendesk ticket ID = 56]
+    A --> H[external_id = royal-tires-asset-6]
+    H -->|supplied to Zendesk for correlation| Z
+    A -->|audit_logs.request_id = 6| E1[AuditLog event A: created]
+    A -->|audit_logs.request_id = 6| E2[AuditLog event B: ticket linked]
+    A -->|audit_logs.request_id = 6| E3[AuditLog event C: status changed]

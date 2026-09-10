@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1330" viewBox="0 0 1200 1330" role="img" aria-labelledby="title desc">
+<title id="title">Continuous Integration</title><desc id="desc">GitHub Actions · .github/workflows/ci.yml. Royal Tyres IT Asset Request Tool. Read the accompanying README for implementation notes.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#1b1b1b"/></marker></defs>
+<rect width="1200" height="1330" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#111111">
+<rect x="40" y="34" width="7" height="73" fill="#d71920"/>
+<text x="64" y="52" font-size="16" font-weight="700" letter-spacing="1.2">ROYAL TYRES IT ASSET REQUEST TOOL</text>
+<text x="64" y="87" font-size="30" font-weight="700">Continuous Integration</text>
+<text x="64" y="115" font-size="18" fill="#52565b">GitHub Actions · .github/workflows/ci.yml</text>
+<text x="1145" y="75" text-anchor="end" font-size="28" font-weight="700" fill="#d71920">07</text>
+<g data-card="Code change → GitHub Actions"><rect x="240" y="155" width="720" height="105" rx="7" fill="#1b1b1b" stroke="#1b1b1b" stroke-width="1.6"/>
+<text x="260" y="186" font-size="21" fill="white" font-weight="700" text-anchor="start">Code change → GitHub Actions</text>
+<text x="260" y="215" font-size="18" fill="white" font-weight="400" text-anchor="start">Pull request targeting main OR push to main</text>
+<text x="260" y="241" font-size="18" fill="white" font-weight="400" text-anchor="start">Workflow/ref concurrency cancels superseded runs.</text>
+</g>
+<polyline points="420,260 420,295 300,295 300,335" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="780,260 780,295 900,295 900,335" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="40" y="335" width="520" height="555" rx="9" fill="#f3f4f5" stroke="#d9dde0"/>
+<text x="58" y="363" font-size="16" fill="#52565b" font-weight="700" text-anchor="start">BACKEND JOB · ubuntu-latest · backend directory</text>
+<rect x="640" y="335" width="520" height="715" rx="9" fill="#f3f4f5" stroke="#d9dde0"/>
+<text x="658" y="363" font-size="16" fill="#52565b" font-weight="700" text-anchor="start">FRONTEND JOB · ubuntu-latest · frontend directory</text>
+<g data-card="Checkout"><rect x="80" y="385" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="100" y="416" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Checkout</text>
+<text x="100" y="445" font-size="18" fill="#111111" font-weight="400" text-anchor="start">actions/checkout@v4</text>
+</g>
+<g data-card="Set up Python 3.13"><rect x="80" y="471" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="100" y="502" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Set up Python 3.13</text>
+<text x="100" y="531" font-size="18" fill="#111111" font-weight="400" text-anchor="start">actions/setup-python@v5 · pip cache</text>
+</g>
+<polyline points="300,455 300,471" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Install requirements"><rect x="80" y="557" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="100" y="588" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Install requirements</text>
+<text x="100" y="617" font-size="18" fill="#111111" font-weight="400" text-anchor="start">python -m pip install -r requirements.txt</text>
+</g>
+<polyline points="300,541 300,557" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Backend tests"><rect x="80" y="643" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="100" y="674" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Backend tests</text>
+<text x="100" y="703" font-size="18" fill="#111111" font-weight="400" text-anchor="start">python -m pytest</text>
+</g>
+<polyline points="300,627 300,643" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Checkout"><rect x="680" y="385" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="416" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Checkout</text>
+<text x="700" y="445" font-size="18" fill="#111111" font-weight="400" text-anchor="start">actions/checkout@v4</text>
+</g>
+<g data-card="Set up Node 22.12.0"><rect x="680" y="471" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="502" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Set up Node 22.12.0</text>
+<text x="700" y="531" font-size="18" fill="#111111" font-weight="400" text-anchor="start">actions/setup-node@v4 · npm cache</text>
+</g>
+<polyline points="900,455 900,471" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Install dependencies"><rect x="680" y="557" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="588" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Install dependencies</text>
+<text x="700" y="617" font-size="18" fill="#111111" font-weight="400" text-anchor="start">npm ci</text>
+</g>
+<polyline points="900,541 900,557" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Frontend unit tests"><rect x="680" y="643" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="674" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Frontend unit tests</text>
+<text x="700" y="703" font-size="18" fill="#111111" font-weight="400" text-anchor="start">npm test</text>
+</g>
+<polyline points="900,627 900,643" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Vite production build"><rect x="680" y="729" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="760" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Vite production build</text>
+<text x="700" y="789" font-size="18" fill="#111111" font-weight="400" text-anchor="start">npm run build</text>
+</g>
+<polyline points="900,713 900,729" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Install Chromium"><rect x="680" y="815" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="846" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Install Chromium</text>
+<text x="700" y="875" font-size="18" fill="#111111" font-weight="400" text-anchor="start">npx playwright install --with-deps chromium</text>
+</g>
+<polyline points="900,799 900,815" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Playwright E2E"><rect x="680" y="901" width="440" height="70" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="700" y="932" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Playwright E2E</text>
+<text x="700" y="961" font-size="18" fill="#111111" font-weight="400" text-anchor="start">npm run test:e2e</text>
+</g>
+<polyline points="900,885 900,901" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="PASS / FAIL"><rect x="80" y="785" width="440" height="70" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="100" y="816" font-size="21" fill="#111111" font-weight="700" text-anchor="start">PASS / FAIL</text>
+<text x="100" y="845" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Automated verification result</text>
+</g>
+<polyline points="300,713 300,785" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="PASS / FAIL"><rect x="680" y="995" width="440" height="42" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="700" y="1026" font-size="21" fill="#111111" font-weight="700" text-anchor="start">PASS / FAIL</text>
+</g>
+<polyline points="900,971 900,995" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="SEPARATE DEPLOYMENT MECHANISM"><rect x="40" y="1100" width="1120" height="105" rx="7" fill="#fff2f3" stroke="#d71920" stroke-width="1.6"/>
+<text x="60" y="1131" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SEPARATE DEPLOYMENT MECHANISM</text>
+<text x="60" y="1160" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Main branch change → Render Auto Deploy → Backend + Frontend</text>
+<text x="60" y="1186" font-size="18" fill="#111111" font-weight="400" text-anchor="start">CI validates; it does not deploy. No branch-protection enforcement is assumed.</text>
+</g>
+<path d="M40 1241 H1160" stroke="#d9dde0"/>
+<text x="44" y="1271" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">CI = automated verification. Render deployment is separate. No manual deploy is needed for these diagrams.</text>
+</g></svg>

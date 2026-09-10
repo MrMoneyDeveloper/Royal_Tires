@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1240" viewBox="0 0 1200 1240" role="img" aria-labelledby="title desc">
+<title id="title">Create Request</title><desc id="desc">End-to-end execution sequence · local persistence first. Royal Tyres IT Asset Request Tool. Read the accompanying README for implementation notes.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#1b1b1b"/></marker></defs>
+<rect width="1200" height="1240" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#111111">
+<rect x="40" y="34" width="7" height="73" fill="#d71920"/>
+<text x="64" y="52" font-size="16" font-weight="700" letter-spacing="1.2">ROYAL TYRES IT ASSET REQUEST TOOL</text>
+<text x="64" y="87" font-size="30" font-weight="700">Create Request</text>
+<text x="64" y="115" font-size="18" fill="#52565b">End-to-end execution sequence · local persistence first</text>
+<text x="1145" y="75" text-anchor="end" font-size="28" font-weight="700" fill="#d71920">03</text>
+<g data-card="Employee → Form"><rect x="40" y="160" width="320" height="95" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="60" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Employee → Form</text>
+<text x="60" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">AssetRequestForm</text>
+<text x="60" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Frontend validation</text>
+</g>
+<g data-card="frontend api.js"><rect x="430" y="160" width="320" height="95" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="450" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">frontend api.js</text>
+<text x="450" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">POST /api/requests</text>
+<text x="450" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Basic Auth + JSON</text>
+</g>
+<g data-card="RequestController"><rect x="820" y="160" width="340" height="95" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="840" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">RequestController</text>
+<text x="840" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">AssetRequestCreate validation</text>
+<text x="840" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">before the route body</text>
+</g>
+<polyline points="360,202 430,202" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="750,202 820,202" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="990,255 990,275 600,275 600,305" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="RequestService"><rect x="365" y="305" width="470" height="78" rx="7" fill="#1b1b1b" stroke="#1b1b1b" stroke-width="1.6"/>
+<text x="385" y="336" font-size="21" fill="white" font-weight="700" text-anchor="start">RequestService</text>
+<text x="385" y="365" font-size="18" fill="white" font-weight="400" text-anchor="start">Owns sequencing and the shared Session</text>
+</g>
+<polyline points="480,383 480,413 265,413 265,443" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="720,383 720,413 940,413 940,443" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="RequestRepository"><rect x="40" y="443" width="450" height="105" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="60" y="474" font-size="21" fill="#111111" font-weight="700" text-anchor="start">RequestRepository</text>
+<text x="60" y="503" font-size="18" fill="#111111" font-weight="400" text-anchor="start">AssetRequest Model → Session flush</text>
+<text x="60" y="529" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Local ID allocated; not yet committed</text>
+</g>
+<g data-card="AuditRepository"><rect x="710" y="443" width="450" height="105" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="730" y="474" font-size="21" fill="#111111" font-weight="700" text-anchor="start">AuditRepository</text>
+<text x="730" y="503" font-size="18" fill="#111111" font-weight="400" text-anchor="start">AuditLog: REQUEST_CREATED</text>
+<text x="730" y="529" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Same transaction; links to local ID</text>
+</g>
+<polyline points="265,548 265,590 600,590 600,620" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="935,548 935,590 600,590" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="POSTGRESQL COMMIT"><rect x="190" y="620" width="820" height="112" rx="7" fill="#fff2f3" stroke="#d71920" stroke-width="1.6"/>
+<text x="210" y="651" font-size="21" fill="#111111" font-weight="700" text-anchor="start">POSTGRESQL COMMIT</text>
+<text x="210" y="680" font-size="18" fill="#111111" font-weight="400" text-anchor="start">PRIMARY REQUEST IS COMMITTED BEFORE CALLING ZENDESK</text>
+<text x="210" y="706" font-size="18" fill="#111111" font-weight="400" text-anchor="start">AssetRequest + AuditLog are now durable.</text>
+</g>
+<polyline points="600,732 600,772" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="RequestService → ZendeskService"><rect x="240" y="772" width="720" height="83" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="260" y="803" font-size="21" fill="#111111" font-weight="700" text-anchor="start">RequestService → ZendeskService</text>
+<text x="260" y="832" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Zendesk Tickets API receives the already-committed request</text>
+</g>
+<polyline points="415,855 415,900 300,900 300,932" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="785,855 785,900 900,900 900,932" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="SUCCESS · ticket ID returned"><rect x="40" y="932" width="530" height="170" rx="7" fill="#eff9f2" stroke="#187343" stroke-width="1.6"/>
+<text x="60" y="963" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SUCCESS · ticket ID returned</text>
+<text x="60" y="992" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Store zendesk_ticket_id and status</text>
+<text x="60" y="1018" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Mark synced; write audit event</text>
+<text x="60" y="1044" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Commit integration outcome locally</text>
+</g>
+<g data-card="FAILURE · ZendeskError"><rect x="630" y="932" width="530" height="170" rx="7" fill="#fff7e9" stroke="#925700" stroke-width="1.6"/>
+<text x="650" y="963" font-size="21" fill="#111111" font-weight="700" text-anchor="start">FAILURE · ZendeskError</text>
+<text x="650" y="992" font-size="18" fill="#111111" font-weight="400" text-anchor="start">KEEP local AssetRequest</text>
+<text x="650" y="1018" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Mark sync_failed; write audit event</text>
+<text x="650" y="1044" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Commit failure state locally</text>
+</g>
+<path d="M40 1151 H1160" stroke="#d9dde0"/>
+<text x="44" y="1181" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">Controller returns the saved request DTO (HTTP 201). External failure cannot undo the first commit.</text>
+<text x="44" y="1207" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">If integration is not configured, the request stays saved with sync_pending.</text>
+</g></svg>

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1250" viewBox="0 0 1200 1250" role="img" aria-labelledby="title desc">
+<title id="title">Application Code Flow</title><desc id="desc">MVC-style layered mental model — not traditional ASP.NET MVC. Royal Tyres IT Asset Request Tool. Read the accompanying README for implementation notes.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#1b1b1b"/></marker></defs>
+<rect width="1200" height="1250" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#111111">
+<rect x="40" y="34" width="7" height="73" fill="#d71920"/>
+<text x="64" y="52" font-size="16" font-weight="700" letter-spacing="1.2">ROYAL TYRES IT ASSET REQUEST TOOL</text>
+<text x="64" y="87" font-size="30" font-weight="700">Application Code Flow</text>
+<text x="64" y="115" font-size="18" fill="#52565b">MVC-style layered mental model — not traditional ASP.NET MVC</text>
+<text x="1145" y="75" text-anchor="end" font-size="28" font-weight="700" fill="#d71920">02</text>
+<rect x="330" y="335" width="525" height="345" rx="9" fill="#f3f4f5" stroke="#d9dde0"/>
+<text x="348" y="363" font-size="16" fill="#52565b" font-weight="700" text-anchor="start"></text>
+<text x="890" y="390" font-size="18" fill="#111111" font-weight="400" text-anchor="start">HTTP pipeline</text>
+<text x="890" y="416" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Middleware wraps</text>
+<text x="890" y="442" font-size="18" fill="#111111" font-weight="400" text-anchor="start">request / response</text>
+<g data-card="React View / Component"><rect x="350" y="160" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">React View / Component</text>
+<text x="370" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">VIEW · what the user sees.</text>
+</g>
+<g data-card="frontend/src/services/api.js"><rect x="350" y="270" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="301" font-size="21" fill="#111111" font-weight="700" text-anchor="start">frontend/src/services/api.js</text>
+<text x="370" y="330" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Browser → FastAPI HTTP boundary.</text>
+</g>
+<polyline points="592,240 592,270" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="FastAPI Controller boundary"><rect x="350" y="380" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="411" font-size="21" fill="#111111" font-weight="700" text-anchor="start">FastAPI Controller boundary</text>
+<text x="370" y="440" font-size="18" fill="#111111" font-weight="400" text-anchor="start">CONTROLLER · HTTP route and dependencies.</text>
+</g>
+<polyline points="592,350 592,380" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Pydantic Schema"><rect x="350" y="490" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="521" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Pydantic Schema</text>
+<text x="370" y="550" font-size="18" fill="#111111" font-weight="400" text-anchor="start">SCHEMA · validates the API data contract.</text>
+</g>
+<polyline points="592,460 592,490" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Service"><rect x="350" y="600" width="485" height="80" rx="7" fill="#1b1b1b" stroke="#1b1b1b" stroke-width="1.6"/>
+<text x="370" y="631" font-size="21" fill="white" font-weight="700" text-anchor="start">Service</text>
+<text x="370" y="660" font-size="18" fill="white" font-weight="400" text-anchor="start">SERVICE · business workflow / execution order.</text>
+</g>
+<polyline points="592,570 592,600" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Repository"><rect x="350" y="710" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="741" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Repository</text>
+<text x="370" y="770" font-size="18" fill="#111111" font-weight="400" text-anchor="start">REPOSITORY · how ORM queries/persistence occur.</text>
+</g>
+<polyline points="592,680 592,710" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="SQLAlchemy Model"><rect x="350" y="820" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="851" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SQLAlchemy Model</text>
+<text x="370" y="880" font-size="18" fill="#111111" font-weight="400" text-anchor="start">MODEL · persisted entity / SQL table mapping.</text>
+</g>
+<polyline points="592,790 592,820" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Session / Engine"><rect x="350" y="930" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="961" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Session / Engine</text>
+<text x="370" y="990" font-size="18" fill="#111111" font-weight="400" text-anchor="start">DATA · unit of work / database connectivity.</text>
+</g>
+<polyline points="592,900 592,930" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="PostgreSQL"><rect x="350" y="1040" width="485" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="370" y="1071" font-size="21" fill="#111111" font-weight="700" text-anchor="start">PostgreSQL</text>
+<text x="370" y="1100" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Primary system of record.</text>
+</g>
+<polyline points="592,1010 592,1040" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Core"><rect x="40" y="430" width="255" height="145" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="461" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Core</text>
+<text x="60" y="490" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Settings</text>
+<text x="60" y="516" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Security</text>
+<text x="60" y="542" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Logging</text>
+</g>
+<polyline points="295,505 315,505 315,420 350,420" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<polyline points="295,505 315,505 315,640 350,640" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<polyline points="295,505 315,505 315,970 350,970" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<g data-card="ZendeskService"><rect x="895" y="600" width="265" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="915" y="631" font-size="21" fill="#111111" font-weight="700" text-anchor="start">ZendeskService</text>
+<text x="915" y="660" font-size="18" fill="#111111" font-weight="400" text-anchor="start">External HTTP / payloads</text>
+</g>
+<polyline points="835,640 895,640" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Zendesk REST API"><rect x="895" y="745" width="265" height="80" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="915" y="776" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Zendesk REST API</text>
+<text x="915" y="805" font-size="18" fill="#111111" font-weight="400" text-anchor="start">External helpdesk</text>
+</g>
+<polyline points="1027,680 1027,745" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="895" y="890" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Middleware returns the</text>
+<text x="895" y="916" font-size="18" fill="#111111" font-weight="400" text-anchor="start">response through safe</text>
+<text x="895" y="942" font-size="18" fill="#111111" font-weight="400" text-anchor="start">logging / header policy.</text>
+<path d="M40 1161 H1160" stroke="#d9dde0"/>
+<text x="44" y="1191" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">Schema validation happens before the Controller route body runs. Arrows show the mental model.</text>
+<text x="44" y="1217" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">Repositories receive the shared Session. Services choose transaction boundaries.</text>
+</g></svg>

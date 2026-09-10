@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1220" viewBox="0 0 1200 1220" role="img" aria-labelledby="title desc">
+<title id="title">Zendesk Status Synchronization</title><desc id="desc">Event-driven webhook flow · external event to local state. Royal Tyres IT Asset Request Tool. Read the accompanying README for implementation notes.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#1b1b1b"/></marker></defs>
+<rect width="1200" height="1220" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#111111">
+<rect x="40" y="34" width="7" height="73" fill="#d71920"/>
+<text x="64" y="52" font-size="16" font-weight="700" letter-spacing="1.2">ROYAL TYRES IT ASSET REQUEST TOOL</text>
+<text x="64" y="87" font-size="30" font-weight="700">Zendesk Status Synchronization</text>
+<text x="64" y="115" font-size="18" fill="#52565b">Event-driven webhook flow · external event to local state</text>
+<text x="1145" y="75" text-anchor="end" font-size="28" font-weight="700" fill="#d71920">05</text>
+<g data-card="Zendesk Agent"><rect x="40" y="160" width="330" height="110" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="60" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Zendesk Agent</text>
+<text x="60" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Changes ticket status</text>
+<text x="60" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Open → Pending</text>
+</g>
+<g data-card="Zendesk Trigger"><rect x="435" y="160" width="330" height="110" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="455" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Zendesk Trigger</text>
+<text x="455" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Royal Tyres portal tag matches</text>
+<text x="455" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Status changed / ticket update</text>
+</g>
+<g data-card="Zendesk Webhook"><rect x="830" y="160" width="330" height="110" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="850" y="191" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Zendesk Webhook</text>
+<text x="850" y="220" font-size="18" fill="#111111" font-weight="400" text-anchor="start">POST JSON</text>
+<text x="850" y="246" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Separate bearer authentication</text>
+</g>
+<polyline points="370,215 435,215" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="765,215 830,215" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="995,270 995,305 600,305 600,345" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="WebhookController · /api/webhooks/zendesk"><rect x="230" y="345" width="740" height="133" rx="7" fill="#fff2f3" stroke="#d71920" stroke-width="1.6"/>
+<text x="250" y="376" font-size="21" fill="#111111" font-weight="700" text-anchor="start">WebhookController · /api/webhooks/zendesk</text>
+<text x="250" y="405" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Webhook schema normalizes / validates: “Pending” → “pending”</text>
+<text x="250" y="431" font-size="18" fill="#111111" font-weight="400" text-anchor="start">FastAPI validates before route body; Controller checks bearer secret</text>
+<text x="250" y="457" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Portal Basic Auth is NOT webhook authentication.</text>
+</g>
+<polyline points="600,478 600,520" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="WebhookService"><rect x="230" y="520" width="740" height="155" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="250" y="551" font-size="21" fill="#111111" font-weight="700" text-anchor="start">WebhookService</text>
+<text x="250" y="580" font-size="18" fill="#111111" font-weight="400" text-anchor="start">RequestRepository: find local Model by zendesk_ticket_id</text>
+<text x="250" y="606" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Verify supplied external_id with request_identity.py</text>
+<text x="250" y="632" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Then update the Session-tracked AssetRequest status / sync timestamp</text>
+</g>
+<polyline points="600,675 600,715" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="AuditRepository → AuditLog → PostgreSQL COMMIT"><rect x="230" y="715" width="740" height="110" rx="7" fill="#1b1b1b" stroke="#1b1b1b" stroke-width="1.6"/>
+<text x="250" y="746" font-size="21" fill="white" font-weight="700" text-anchor="start">AuditRepository → AuditLog → PostgreSQL COMMIT</text>
+<text x="250" y="775" font-size="18" fill="white" font-weight="400" text-anchor="start">Status and audit commit together in the shared Session</text>
+<text x="250" y="801" font-size="18" fill="white" font-weight="400" text-anchor="start">ZENDESK_STATUS_CHANGED (or receipt event if unchanged)</text>
+</g>
+<polyline points="600,825 600,865" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="Local API → RequestDetailView / Dashboard"><rect x="230" y="865" width="740" height="100" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="250" y="896" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Local API → RequestDetailView / Dashboard</text>
+<text x="250" y="925" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Tracking polls every 10 seconds; Dashboard loads / refreshes</text>
+<text x="250" y="951" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Both display persisted local state; neither calls Zendesk directly.</text>
+</g>
+<g data-card="NORMAL API CALL"><rect x="40" y="1000" width="530" height="105" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="60" y="1031" font-size="21" fill="#111111" font-weight="700" text-anchor="start">NORMAL API CALL</text>
+<text x="60" y="1060" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Our application initiates the HTTP request.</text>
+</g>
+<g data-card="WEBHOOK"><rect x="630" y="1000" width="530" height="105" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="650" y="1031" font-size="21" fill="#111111" font-weight="700" text-anchor="start">WEBHOOK</text>
+<text x="650" y="1060" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Zendesk initiates HTTP after an event.</text>
+</g>
+<path d="M40 1131 H1160" stroke="#d9dde0"/>
+<text x="44" y="1161" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">Both use HTTP. external_id is optional in the schema and checked when supplied; event ordering is not implemented.</text>
+</g></svg>
