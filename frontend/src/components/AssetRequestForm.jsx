@@ -3,7 +3,7 @@ import {
   ASSET_TYPES,
   meaningfulCharacterCount,
   validateRequest,
-} from '../services/validation.js';
+} from '../helpers/validation.js';
 
 const initialValues = {
   requester_name: '',
@@ -79,7 +79,7 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
         </div>
         <div className="field">
           <label htmlFor="requester_email">
-            Requester email <span aria-hidden="true">*</span>
+            Email address <span aria-hidden="true">*</span>
           </label>
           <input
             {...fieldProps('requester_email')}
@@ -87,7 +87,7 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
             autoComplete="email"
             maxLength={254}
             required
-            placeholder="you@company.com"
+            placeholder="name@royaltyres.co.za"
           />
           {errors.requester_email && (
             <p className="field-error" id="requester_email-error">
@@ -96,11 +96,12 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
           )}
         </div>
       </div>
+
       <div className="section-title separated">
         <span className="step">02</span>
         <div>
-          <h2>What do you need?</h2>
-          <p>Choose your asset and tell us how it will help.</p>
+          <h2>Equipment request</h2>
+          <p>Choose the asset and tell IT why it is needed.</p>
         </div>
       </div>
       <div className="field">
@@ -108,9 +109,11 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
           Asset type <span aria-hidden="true">*</span>
         </label>
         <select {...fieldProps('asset_type')} required>
-          <option value="">Select an asset</option>
+          <option value="">Choose an asset</option>
           {ASSET_TYPES.map((asset) => (
-            <option key={asset}>{asset}</option>
+            <option key={asset} value={asset}>
+              {asset}
+            </option>
           ))}
         </select>
         {errors.asset_type && (
@@ -125,36 +128,31 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
         </label>
         <textarea
           {...fieldProps('reason')}
-          rows={5}
           maxLength={1000}
           required
-          placeholder="Tell us why you need this asset, including any issue with your current equipment."
+          placeholder="Explain what the equipment is needed for and any urgency."
         />
         <div className="field-hint">
-          <span>
-            {errors.reason ? (
-              <span className="field-error" id="reason-error">
-                {errors.reason}
-              </span>
-            ) : (
-              'A little context helps IT understand your request. Minimum 10 meaningful characters.'
-            )}
-          </span>
-          <span>
-            {meaningfulCharacterCount(values.reason)} meaningful · {values.reason.length}/1000 total
-          </span>
+          <span>Minimum 10 non-whitespace characters</span>
+          <span>{meaningfulCharacterCount(values.reason)}/10 meaningful</span>
         </div>
+        {errors.reason && (
+          <p className="field-error" id="reason-error">
+            {errors.reason}
+          </p>
+        )}
       </div>
+
       {error && (
-        <div className="notice error" role="alert">
+        <p className="notice error" role="alert">
           {error}
-        </div>
+        </p>
       )}
       <div className="form-footer">
-        <span>All fields are required.</span>
-        <button className="button primary" disabled={submitting}>
-          {submitting ? 'Saving your request…' : 'Submit IT Asset Request'}{' '}
-          <span aria-hidden="true">↗</span>
+        <span>Required fields are marked *</span>
+        <button type="submit" className="button primary" disabled={submitting}>
+          {submitting ? 'Submitting…' : 'Submit request'}{' '}
+          <span aria-hidden="true">→</span>
         </button>
       </div>
     </form>
