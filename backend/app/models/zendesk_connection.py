@@ -1,20 +1,19 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, String, Text
+from sqlalchemy import BigInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base, UTCDateTime, utc_now
 
 
 class ZendeskConnection(Base):
-    """Singleton Zendesk connection/configuration record for the demo portal."""
+    """Singleton record for verified Zendesk metadata and managed object IDs."""
 
     __tablename__ = "zendesk_connection"
 
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     subdomain: Mapped[str] = mapped_column(String(100))
     api_email: Mapped[str] = mapped_column(String(254))
-    encrypted_api_token: Mapped[str] = mapped_column(Text)
 
     connected_user_name: Mapped[str | None] = mapped_column(String(150))
     connected_user_email: Mapped[str | None] = mapped_column(String(254))
