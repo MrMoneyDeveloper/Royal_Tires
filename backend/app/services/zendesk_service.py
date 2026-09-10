@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -10,6 +11,8 @@ from app.database import utc_now
 from app.models.asset_request import AssetRequest
 from app.models.zendesk_connection import ZendeskConnection
 
+logger = logging.getLogger(__name__)
+
 _SUBDOMAIN = re.compile(r"^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$|^[a-z0-9]$")
 
 BRAND_NAME = "Royal Tyres"
@@ -18,10 +21,12 @@ FORM_NAME = "Royal Tyres | IT Asset Request"
 VIEW_NAME = "Royal Tyres | IT Asset Requests"
 PORTAL_TAG = "royal_tires_asset_portal"
 
+# Zendesk calls a single-select dropdown a `tagger` in the Ticket Fields API.
+# `dropdown` is UI terminology and is not a valid ticket-field API type.
 FIELD_DEFINITIONS = {
     "asset_type_field": {
         "title": "RT | Asset Type",
-        "type": "dropdown",
+        "type": "tagger",
         "custom_field_options": [
             {"name": "Laptop", "value": "laptop"},
             {"name": "Monitor", "value": "monitor"},
@@ -38,7 +43,7 @@ FIELD_DEFINITIONS = {
     },
     "request_source_field": {
         "title": "RT | Request Source",
-        "type": "dropdown",
+        "type": "tagger",
         "custom_field_options": [
             {"name": "Royal Tyres Asset Portal", "value": PORTAL_TAG},
         ],
@@ -99,6 +104,32 @@ def _credentials_from_settings(settings: Settings) -> ZendeskCredentials:
     return ZendeskCredentials(normalize_subdomain(subdomain), email, token)
 
 
+def _safe_zendesk_error(response: httpx.Response) -> str:
+    """Extract only Zendesk's high-level error text, never request credentials/body."""
+    try:
+        data = response.json()
+    except ValueError:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+
+    parts: list[str] = []
+    for key in ("error", "description"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+        elif isinstance(value, dict):
+            title = value.get("title")
+            message = value.get("message")
+            if isinstance(title, str) and title.strip():
+                parts.append(title.strip())
+            if isinstance(message, str) and message.strip():
+                parts.append(message.strip())
+
+    # Keep browser-facing diagnostics useful but bounded.
+    return " | ".join(dict.fromkeys(parts))[:300]
+
+
 def _request_json(
     credentials: ZendeskCredentials,
     method: str,
@@ -108,7 +139,10 @@ def _request_json(
     base = f"https://{credentials.subdomain}.zendesk.com"
     if path_or_url.startswith("http"):
         parsed = urlsplit(path_or_url)
-        if parsed.scheme != "https" or parsed.hostname != f"{credentials.subdomain}.zendesk.com":
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != f"{credentials.subdomain}.zendesk.com"
+        ):
             raise ZendeskError("Zendesk returned an unexpected pagination URL.")
         url = path_or_url
     else:
@@ -129,14 +163,24 @@ def _request_json(
     except httpx.HTTPError as exc:
         raise ZendeskError("Zendesk could not be reached. Try the connection again.") from exc
 
+    safe_path = urlsplit(url).path
     if response.status_code in {401, 403}:
         raise ZendeskError(
             "Zendesk rejected the configured credentials or the user lacks permission for this action.",
             400,
         )
     if response.status_code >= 400:
+        detail = _safe_zendesk_error(response)
+        logger.warning(
+            "Zendesk API failure method=%s path=%s status=%s detail=%s",
+            method,
+            safe_path,
+            response.status_code,
+            detail or "none",
+        )
+        suffix = f": {detail}" if detail else "."
         raise ZendeskError(
-            f"Zendesk returned HTTP {response.status_code} while processing the setup.",
+            f"Zendesk returned HTTP {response.status_code} for {method} {safe_path}{suffix}",
             502,
         )
 
@@ -177,13 +221,19 @@ def _discover(credentials: ZendeskCredentials) -> dict[str, list[dict]]:
     return {
         "brands": _list_all(credentials, "/api/v2/brands.json", "brands"),
         "groups": _list_all(credentials, "/api/v2/groups.json", "groups"),
-        "fields": _list_all(credentials, "/api/v2/ticket_fields.json", "ticket_fields"),
-        "forms": _list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"),
+        "fields": _list_all(
+            credentials, "/api/v2/ticket_fields.json", "ticket_fields"
+        ),
+        "forms": _list_all(
+            credentials, "/api/v2/ticket_forms.json", "ticket_forms"
+        ),
         "views": _list_all(credentials, "/api/v2/views.json", "views"),
     }
 
 
-def _plan_item(key: str, object_type: str, name: str, match: dict | None) -> dict:
+def _plan_item(
+    key: str, object_type: str, name: str, match: dict | None
+) -> dict:
     object_id = match.get("id") if match else None
     return {
         "key": key,
@@ -197,8 +247,18 @@ def _plan_item(key: str, object_type: str, name: str, match: dict | None) -> dic
 def build_setup_plan(credentials: ZendeskCredentials) -> list[dict]:
     current = _discover(credentials)
     plan = [
-        _plan_item("brand", "Brand", BRAND_NAME, _find_named(current["brands"], BRAND_NAME)),
-        _plan_item("group", "Group", GROUP_NAME, _find_named(current["groups"], GROUP_NAME)),
+        _plan_item(
+            "brand",
+            "Brand",
+            BRAND_NAME,
+            _find_named(current["brands"], BRAND_NAME),
+        ),
+        _plan_item(
+            "group",
+            "Group",
+            GROUP_NAME,
+            _find_named(current["groups"], GROUP_NAME),
+        ),
     ]
     for key, definition in FIELD_DEFINITIONS.items():
         plan.append(
@@ -211,8 +271,18 @@ def build_setup_plan(credentials: ZendeskCredentials) -> list[dict]:
         )
     plan.extend(
         [
-            _plan_item("ticket_form", "Ticket form", FORM_NAME, _find_named(current["forms"], FORM_NAME)),
-            _plan_item("view", "View", VIEW_NAME, _find_named(current["views"], VIEW_NAME)),
+            _plan_item(
+                "ticket_form",
+                "Ticket form",
+                FORM_NAME,
+                _find_named(current["forms"], FORM_NAME),
+            ),
+            _plan_item(
+                "view",
+                "View",
+                VIEW_NAME,
+                _find_named(current["views"], VIEW_NAME),
+            ),
         ]
     )
     return plan
@@ -253,7 +323,8 @@ def _status(
             "plan": [],
             "ids": None,
             "verification": verification or [],
-            "message": message or "Test the Zendesk environment connection to build the setup plan.",
+            "message": message
+            or "Test the Zendesk environment connection to build the setup plan.",
         }
     return {
         "environment_configured": environment_configured,
@@ -327,7 +398,9 @@ def connect(db: Session, settings: Settings) -> dict:
     data = _request_json(credentials, "GET", "/api/v2/users/me.json")
     user = data.get("user") if isinstance(data, dict) else None
     if not isinstance(user, dict) or not isinstance(user.get("id"), int):
-        raise ZendeskError("Zendesk login succeeded but returned an invalid user response.")
+        raise ZendeskError(
+            "Zendesk login succeeded but returned an invalid user response."
+        )
 
     connection = get_connection(db)
     changed_instance = bool(
@@ -375,9 +448,12 @@ def connect(db: Session, settings: Settings) -> dict:
 
 
 def _ensure_brand(credentials: ZendeskCredentials) -> int:
-    existing = _find_named(_list_all(credentials, "/api/v2/brands.json", "brands"), BRAND_NAME)
+    existing = _find_named(
+        _list_all(credentials, "/api/v2/brands.json", "brands"), BRAND_NAME
+    )
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
+
     subdomain = f"{credentials.subdomain}-royal-tyres"[:99].strip("-")
     data = _request_json(
         credentials,
@@ -392,9 +468,12 @@ def _ensure_brand(credentials: ZendeskCredentials) -> int:
 
 
 def _ensure_group(credentials: ZendeskCredentials) -> int:
-    existing = _find_named(_list_all(credentials, "/api/v2/groups.json", "groups"), GROUP_NAME)
+    existing = _find_named(
+        _list_all(credentials, "/api/v2/groups.json", "groups"), GROUP_NAME
+    )
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
+
     data = _request_json(
         credentials,
         "POST",
@@ -420,11 +499,13 @@ def _ensure_field(credentials: ZendeskCredentials, definition: dict) -> int:
         "type": definition["type"],
         "active": True,
         "required": False,
+        "required_in_portal": False,
         "visible_in_portal": False,
         "editable_in_portal": False,
     }
     if definition.get("custom_field_options"):
         field["custom_field_options"] = definition["custom_field_options"]
+
     data = _request_json(
         credentials,
         "POST",
@@ -433,7 +514,9 @@ def _ensure_field(credentials: ZendeskCredentials, definition: dict) -> int:
     )
     item = data.get("ticket_field")
     if not isinstance(item, dict) or not isinstance(item.get("id"), int):
-        raise ZendeskError(f"Zendesk did not return the field ID for {definition['title']}.")
+        raise ZendeskError(
+            f"Zendesk did not return the field ID for {definition['title']}."
+        )
     return item["id"]
 
 
@@ -442,9 +525,13 @@ def _ensure_form(
     brand_id: int,
     field_ids: list[int],
 ) -> int:
-    existing = _find_named(_list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"), FORM_NAME)
+    existing = _find_named(
+        _list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"),
+        FORM_NAME,
+    )
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
+
     data = _request_json(
         credentials,
         "POST",
@@ -468,9 +555,12 @@ def _ensure_form(
 
 
 def _ensure_view(credentials: ZendeskCredentials, group_id: int) -> int:
-    existing = _find_named(_list_all(credentials, "/api/v2/views.json", "views"), VIEW_NAME)
+    existing = _find_named(
+        _list_all(credentials, "/api/v2/views.json", "views"), VIEW_NAME
+    )
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
+
     data = _request_json(
         credentials,
         "POST",
@@ -480,12 +570,28 @@ def _ensure_view(credentials: ZendeskCredentials, group_id: int) -> int:
                 "title": VIEW_NAME,
                 "active": True,
                 "all": [
-                    {"field": "group_id", "operator": "is", "value": str(group_id)},
-                    {"field": "current_tags", "operator": "includes", "value": PORTAL_TAG},
+                    {
+                        "field": "group_id",
+                        "operator": "is",
+                        "value": str(group_id),
+                    },
+                    {
+                        "field": "current_tags",
+                        "operator": "includes",
+                        "value": PORTAL_TAG,
+                    },
                 ],
                 "any": [],
+                # Zendesk's API column value for the UI Subject column is
+                # `description`, not `subject`.
                 "output": {
-                    "columns": ["status", "requester", "subject", "priority", "updated"]
+                    "columns": [
+                        "status",
+                        "requester",
+                        "description",
+                        "priority",
+                        "updated",
+                    ]
                 },
             }
         },
@@ -517,9 +623,14 @@ def _verify_object(
 def apply_setup(db: Session, settings: Settings) -> dict:
     connection = get_connection(db)
     if connection is None:
-        raise ZendeskError("Test the Zendesk environment connection before applying configuration.", 400)
+        raise ZendeskError(
+            "Test the Zendesk environment connection before applying configuration.",
+            400,
+        )
     if connection.connected_user_role != "admin":
-        raise ZendeskError("A Zendesk admin user is required to apply configuration.", 403)
+        raise ZendeskError(
+            "A Zendesk admin user is required to apply configuration.", 403
+        )
 
     credentials = _credentials_from_settings(settings)
     if (
@@ -531,18 +642,27 @@ def apply_setup(db: Session, settings: Settings) -> dict:
             409,
         )
 
-    # Fresh discovery occurs before mutation. Every ensure function is idempotent:
-    # it reuses an exact Royal Tyres object if one already exists and creates only
-    # the missing object. Unrelated Zendesk configuration is never deleted.
+    # Every ensure operation re-reads its object type immediately before mutation.
+    # A partial previous run therefore becomes REUSE + continue rather than duplicates.
     brand_id = _ensure_brand(credentials)
     group_id = _ensure_group(credentials)
-    asset_type_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["asset_type_field"])
-    local_request_id_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["local_request_id_field"])
-    request_source_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["request_source_field"])
+    asset_type_field_id = _ensure_field(
+        credentials, FIELD_DEFINITIONS["asset_type_field"]
+    )
+    local_request_id_field_id = _ensure_field(
+        credentials, FIELD_DEFINITIONS["local_request_id_field"]
+    )
+    request_source_field_id = _ensure_field(
+        credentials, FIELD_DEFINITIONS["request_source_field"]
+    )
     ticket_form_id = _ensure_form(
         credentials,
         brand_id,
-        [asset_type_field_id, local_request_id_field_id, request_source_field_id],
+        [
+            asset_type_field_id,
+            local_request_id_field_id,
+            request_source_field_id,
+        ],
     )
     view_id = _ensure_view(credentials, group_id)
 
@@ -556,17 +676,61 @@ def apply_setup(db: Session, settings: Settings) -> dict:
     connection.configured_at = utc_now()
 
     verification = [
-        _verify_object(credentials, "Brand", brand_id, f"/api/v2/brands/{brand_id}.json", "brand"),
-        _verify_object(credentials, "Group", group_id, f"/api/v2/groups/{group_id}.json", "group"),
-        _verify_object(credentials, "Asset Type field", asset_type_field_id, f"/api/v2/ticket_fields/{asset_type_field_id}.json", "ticket_field"),
-        _verify_object(credentials, "Local Request ID field", local_request_id_field_id, f"/api/v2/ticket_fields/{local_request_id_field_id}.json", "ticket_field"),
-        _verify_object(credentials, "Request Source field", request_source_field_id, f"/api/v2/ticket_fields/{request_source_field_id}.json", "ticket_field"),
-        _verify_object(credentials, "Ticket form", ticket_form_id, f"/api/v2/ticket_forms/{ticket_form_id}.json", "ticket_form"),
-        _verify_object(credentials, "View", view_id, f"/api/v2/views/{view_id}.json", "view"),
+        _verify_object(
+            credentials,
+            "Brand",
+            brand_id,
+            f"/api/v2/brands/{brand_id}.json",
+            "brand",
+        ),
+        _verify_object(
+            credentials,
+            "Group",
+            group_id,
+            f"/api/v2/groups/{group_id}.json",
+            "group",
+        ),
+        _verify_object(
+            credentials,
+            "Asset Type field",
+            asset_type_field_id,
+            f"/api/v2/ticket_fields/{asset_type_field_id}.json",
+            "ticket_field",
+        ),
+        _verify_object(
+            credentials,
+            "Local Request ID field",
+            local_request_id_field_id,
+            f"/api/v2/ticket_fields/{local_request_id_field_id}.json",
+            "ticket_field",
+        ),
+        _verify_object(
+            credentials,
+            "Request Source field",
+            request_source_field_id,
+            f"/api/v2/ticket_fields/{request_source_field_id}.json",
+            "ticket_field",
+        ),
+        _verify_object(
+            credentials,
+            "Ticket form",
+            ticket_form_id,
+            f"/api/v2/ticket_forms/{ticket_form_id}.json",
+            "ticket_form",
+        ),
+        _verify_object(
+            credentials,
+            "View",
+            view_id,
+            f"/api/v2/views/{view_id}.json",
+            "view",
+        ),
     ]
     if not all(item["ok"] for item in verification):
         db.commit()
-        raise ZendeskError("Zendesk configuration was applied but post-change verification failed.")
+        raise ZendeskError(
+            "Zendesk configuration was applied but post-change verification failed."
+        )
 
     connection.verified_at = utc_now()
     db.commit()
@@ -589,16 +753,22 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
     connection = get_connection(db)
     if connection is None or not is_configured_record(connection):
         raise ZendeskError("Zendesk integration is not configured.", 503)
+
     credentials = _credentials_from_settings(settings)
     if (
         connection.subdomain != credentials.subdomain
         or connection.api_email.casefold() != credentials.email.casefold()
     ):
-        raise ZendeskError("Zendesk environment values changed. Re-test the connection.", 503)
+        raise ZendeskError(
+            "Zendesk environment values changed. Re-test the connection.", 503
+        )
 
     payload = {
         "ticket": {
-            "subject": f"IT Asset Request #{record.id} - {record.asset_type} - {record.requester_name}",
+            "subject": (
+                f"IT Asset Request #{record.id} - "
+                f"{record.asset_type} - {record.requester_name}"
+            ),
             "comment": {
                 "body": (
                     f"IT asset request #{record.id}\n\n"
@@ -617,9 +787,18 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
             "group_id": connection.group_id,
             "ticket_form_id": connection.ticket_form_id,
             "custom_fields": [
-                {"id": connection.asset_type_field_id, "value": _asset_value(record.asset_type)},
-                {"id": connection.local_request_id_field_id, "value": str(record.id)},
-                {"id": connection.request_source_field_id, "value": PORTAL_TAG},
+                {
+                    "id": connection.asset_type_field_id,
+                    "value": _asset_value(record.asset_type),
+                },
+                {
+                    "id": connection.local_request_id_field_id,
+                    "value": str(record.id),
+                },
+                {
+                    "id": connection.request_source_field_id,
+                    "value": PORTAL_TAG,
+                },
             ],
             "tags": [
                 "it_asset_request",

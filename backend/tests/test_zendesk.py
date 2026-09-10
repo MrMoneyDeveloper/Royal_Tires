@@ -68,6 +68,39 @@ def seed_configured_connection(app):
         db.commit()
 
 
+def test_dropdown_definitions_use_zendesk_tagger_api_type():
+    assert zendesk_service.FIELD_DEFINITIONS["asset_type_field"]["type"] == "tagger"
+    assert zendesk_service.FIELD_DEFINITIONS["request_source_field"]["type"] == "tagger"
+
+
+def test_view_uses_valid_zendesk_subject_column_value(monkeypatch):
+    credentials = zendesk_service.ZendeskCredentials(
+        subdomain="example",
+        email="admin@example.com",
+        token="secret-token",
+    )
+    captured = {}
+
+    monkeypatch.setattr(zendesk_service, "_list_all", lambda *args, **kwargs: [])
+
+    def fake_request(credentials, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"view": {"id": 700}}
+
+    monkeypatch.setattr(zendesk_service, "_request_json", fake_request)
+
+    view_id = zendesk_service._ensure_view(credentials, 200)
+
+    assert view_id == 700
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v2/views.json"
+    columns = captured["payload"]["view"]["output"]["columns"]
+    assert "description" in columns
+    assert "subject" not in columns
+
+
 def test_status_reports_missing_environment(tmp_path):
     settings = Settings(
         _env_file=None,
