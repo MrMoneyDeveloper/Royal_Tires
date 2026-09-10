@@ -17,7 +17,9 @@ def zendesk_app(tmp_path):
         app_username="test-user",
         app_password="unit-test-password",
         frontend_url="https://portal.example.com",
-        config_encryption_key="unit-test-encryption-key-that-is-long-enough",
+        zendesk_subdomain="example",
+        zendesk_email="admin@example.com",
+        zendesk_api_token="secret-token",
     )
     application = create_app(settings)
     yield application
@@ -51,9 +53,6 @@ def seed_configured_connection(app):
             id=1,
             subdomain="example",
             api_email="admin@example.com",
-            encrypted_api_token=zendesk_service._encrypt_token(
-                app.state.settings, "unit-test-token"
-            ),
             connected_user_name="Admin User",
             connected_user_email="admin@example.com",
             connected_user_role="admin",
@@ -69,10 +68,32 @@ def seed_configured_connection(app):
         db.commit()
 
 
-def test_connect_validates_login_and_returns_dry_run_plan(
+def test_status_reports_missing_environment(tmp_path):
+    settings = Settings(
+        _env_file=None,
+        database_url=f"sqlite:///{(tmp_path / 'missing-env.db').as_posix()}",
+        app_username="test-user",
+        app_password="unit-test-password",
+        frontend_url="https://portal.example.com",
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        client.auth = ("test-user", "unit-test-password")
+        response = client.get("/api/zendesk/setup")
+    app.state.engine.dispose()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["environment_configured"] is False
+    assert body["connected"] is False
+
+
+def test_connect_validates_env_login_and_returns_dry_run_plan(
     monkeypatch, zendesk_app, zendesk_client
 ):
     def fake_request(credentials, method, path, payload=None):
+        assert credentials.subdomain == "example"
+        assert credentials.email == "admin@example.com"
         assert credentials.token == "secret-token"
         assert method == "GET"
         assert path == "/api/v2/users/me.json"
@@ -100,17 +121,11 @@ def test_connect_validates_login_and_returns_dry_run_plan(
         ],
     )
 
-    response = zendesk_client.post(
-        "/api/zendesk/connect",
-        json={
-            "subdomain": "example.zendesk.com",
-            "email": "admin@example.com",
-            "api_token": "secret-token",
-        },
-    )
+    response = zendesk_client.post("/api/zendesk/connect")
 
     assert response.status_code == 200
     body = response.json()
+    assert body["environment_configured"] is True
     assert body["connected"] is True
     assert body["configured"] is False
     assert body["can_configure"] is True
@@ -121,10 +136,9 @@ def test_connect_validates_login_and_returns_dry_run_plan(
     with zendesk_app.state.session_factory() as db:
         stored = db.get(ZendeskConnection, 1)
         assert stored is not None
-        assert stored.encrypted_api_token != "secret-token"
-        assert zendesk_service._decrypt_token(
-            zendesk_app.state.settings, stored.encrypted_api_token
-        ) == "secret-token"
+        assert stored.subdomain == "example"
+        assert stored.api_email == "admin@example.com"
+        assert not hasattr(stored, "encrypted_api_token")
 
 
 def test_apply_requires_explicit_confirmation(zendesk_client):
