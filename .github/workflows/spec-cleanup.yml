@@ -1,0 +1,30 @@
+name: Spec Cleanup
+
+on:
+  push:
+    branches:
+      - refactor/mvc-physical-structure
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/mvc-physical-structure
+          fetch-depth: 0
+      - name: Align specification with physical repository
+        run: |
+          set -euo pipefail
+          python scripts/spec_cleanup.py
+          rm -f scripts/spec_cleanup.py
+          rm -f .github/workflows/spec-cleanup.yml
+          git config user.name "MrMoneyDeveloper"
+          git config user.email "mohammedfarhaanbuckas@outlook.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "docs: align specification with final MVC layout"
+          git push origin HEAD:refactor/mvc-physical-structure
