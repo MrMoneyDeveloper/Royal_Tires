@@ -29,6 +29,23 @@ test('sends Basic Auth and JSON to configured backend', async (t) => {
   assert.equal(JSON.parse(call[1].body).reason, 'Example reason');
 });
 
+test('sends the exact reviewed Zendesk plan fingerprint on apply', async (t) => {
+  let call;
+  t.mock.method(globalThis, 'fetch', async (...args) => {
+    call = args;
+    return new Response('{"configured":true}', { status: 200 });
+  });
+  const fingerprint = 'a'.repeat(64);
+
+  await createApi(credentials, options).applyZendeskSetup(fingerprint);
+
+  assert.equal(call[0], 'https://api.example.com/api/zendesk/apply');
+  assert.deepEqual(JSON.parse(call[1].body), {
+    confirm: true,
+    plan_fingerprint: fingerprint,
+  });
+});
+
 test('reports validation errors and handles revoked authentication', async (t) => {
   t.mock.method(
     globalThis,
