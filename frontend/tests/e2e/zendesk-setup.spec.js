@@ -8,17 +8,28 @@ const plan = [
   ['request_source_field', 'Ticket field', 'RT | Request Source'],
   ['ticket_form', 'Ticket form', 'Royal Tyres | IT Asset Request'],
   ['view', 'View', 'Royal Tyres | IT Asset Requests'],
+  ['email_target', 'Email target', 'Royal Tyres | Demo Notifications'],
+  ['status_webhook', 'Webhook', 'Royal Tyres | Asset Status Sync'],
+  ['trigger_new_email', 'Trigger', 'Royal Tyres | Notify Demo Receiver - New Request'],
+  ['trigger_status_email', 'Trigger', 'Royal Tyres | Notify Demo Receiver - Status Update'],
+  ['trigger_status_sync', 'Trigger', 'Royal Tyres | Sync Status to Asset Portal'],
 ].map(([key, object_type, name]) => ({
   key,
   object_type,
   name,
   action: 'create',
   existing_id: null,
+  details: key === 'email_target' ? 'Receiver: farhaanhotd1@gmail.com' : null,
 }));
 
 const planFingerprint = 'a'.repeat(64);
+const common = {
+  environment_configured: true,
+  workflow_environment_ready: true,
+  notification_email: 'farhaanhotd1@gmail.com',
+};
 
-test('tests env credentials, previews and explicitly applies Zendesk configuration', async ({ page }) => {
+test('tests env credentials, previews and explicitly applies complete Zendesk workflow', async ({ page }) => {
   let connected = false;
   let configured = false;
 
@@ -35,7 +46,7 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
       return route.fulfill({
         json: connected
           ? {
-              environment_configured: true,
+              ...common,
               connected: true,
               configured,
               can_configure: true,
@@ -45,10 +56,10 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
               plan_fingerprint: planFingerprint,
               ids: null,
               verification: [],
-              message: 'Connection verified. Review the dry-run plan before applying configuration.',
+              message: 'Connection verified. Review the complete dry-run plan before applying configuration.',
             }
           : {
-              environment_configured: true,
+              ...common,
               connected: false,
               configured: false,
               can_configure: false,
@@ -68,7 +79,7 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
       expect(request.postData()).toBeNull();
       return route.fulfill({
         json: {
-          environment_configured: true,
+          ...common,
           connected: true,
           configured: false,
           can_configure: true,
@@ -78,7 +89,7 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
           plan_fingerprint: planFingerprint,
           ids: null,
           verification: [],
-          message: 'Connection verified from backend environment variables. Review the plan and confirm before any Zendesk configuration is changed.',
+          message: 'Connection verified from backend environment variables. Review the complete plan and confirm before any Zendesk configuration is changed.',
         },
       });
     }
@@ -91,7 +102,7 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
       });
       return route.fulfill({
         json: {
-          environment_configured: true,
+          ...common,
           connected: true,
           configured: true,
           can_configure: true,
@@ -100,17 +111,17 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
           plan: plan.map((item, index) => ({
             ...item,
             action: 'reuse',
-            existing_id: 100 + index,
+            existing_id: item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index,
           })),
           plan_fingerprint: 'b'.repeat(64),
           ids: { brand_id: 100, group_id: 101, ticket_form_id: 105, view_id: 106 },
           verification: plan.map((item, index) => ({
             object_type: item.object_type,
-            id: 100 + index,
+            id: item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index,
             ok: true,
             result: 'PASS',
           })),
-          message: 'Zendesk configuration applied and verified successfully.',
+          message: 'Zendesk configuration, demo email notifications and Track a request status sync were applied and verified successfully.',
         },
       });
     }
@@ -128,7 +139,10 @@ test('tests env credentials, previews and explicitly applies Zendesk configurati
   await page.getByRole('button', { name: /Test environment connection/ }).click();
 
   await expect(page.getByText('example.zendesk.com')).toBeVisible();
-  await expect(page.getByText('Royal Tyres | IT Service Desk')).toBeVisible();
+  await expect(page.getByText('Royal Tyres | Demo Notifications')).toBeVisible();
+  await expect(page.getByText('Royal Tyres | Asset Status Sync')).toBeVisible();
+  await expect(page.getByText('Royal Tyres | Sync Status to Asset Portal')).toBeVisible();
+  await expect(page.getByText('farhaanhotd1@gmail.com')).toBeVisible();
   await expect(page.getByText('CREATE').first()).toBeVisible();
   await expect(page.getByText(/Reviewed plan ref:/)).toBeVisible();
 
