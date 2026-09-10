@@ -3,6 +3,7 @@ import { createApi } from './services/api.js';
 import AppLink from './components/AppLink.jsx';
 import RequestView from './views/RequestView.jsx';
 import RequestDetailView from './views/RequestDetailView.jsx';
+import ZendeskSetupView from './views/ZendeskSetupView.jsx';
 
 function Brand() {
   return (
@@ -134,6 +135,9 @@ export default function App() {
 
   const match = path.match(/^\/requests\/(\d+)\/?$/);
   const isRequest = path === '/' || path === '/request' || path === '/request/';
+  const isZendeskSetup =
+    path === '/zendesk-setup' || path === '/zendesk-setup/';
+
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -147,6 +151,14 @@ export default function App() {
             aria-current={isRequest ? 'page' : undefined}
           >
             <span aria-hidden="true">＋</span> New request
+          </AppLink>
+          <AppLink
+            to="/zendesk-setup"
+            navigate={navigate}
+            className={`nav-item ${isZendeskSetup ? 'active' : ''}`}
+            aria-current={isZendeskSetup ? 'page' : undefined}
+          >
+            <span aria-hidden="true">↗</span> Zendesk setup
           </AppLink>
         </nav>
         <form
@@ -179,7 +191,10 @@ export default function App() {
       <div className="workspace">
         <header className="topbar">
           <span>
-            IT Service Desk <span className="breadcrumb">/ Asset requests</span>
+            IT Service Desk{' '}
+            <span className="breadcrumb">
+              / {isZendeskSetup ? 'Zendesk setup' : 'Asset requests'}
+            </span>
           </span>
           <div className="account">
             <span className="avatar" aria-hidden="true">
@@ -201,6 +216,8 @@ export default function App() {
         <main className="main-content">
           {isRequest ? (
             <RequestView api={api} navigate={navigate} />
+          ) : isZendeskSetup ? (
+            <ZendeskSetupView api={api} />
           ) : match ? (
             <RequestDetailView
               key={match[1]}
