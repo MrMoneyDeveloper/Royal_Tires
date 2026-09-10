@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import './requests.css';
 
 function formatDate(value) {
   return value
