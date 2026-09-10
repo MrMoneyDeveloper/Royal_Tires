@@ -152,7 +152,7 @@ test('tests env credentials, previews governed changes and explicitly applies th
   await expect(page.getByText('Managed Royal Tyres configuration')).toBeVisible();
   await expect(page.getByText('Existing sandbox safeguards')).toBeVisible();
   await expect(page.getByText('Issue Category 1')).toBeVisible();
-  await expect(page.getByText('Brand IS NOT Royal Tyres', { exact: false })).toBeVisible();
+  await expect(page.getByText('Brand IS NOT Royal Tyres', { exact: true })).toBeVisible();
   await expect(page.getByText('Royal Tyres | Demo Notifications')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Asset Status Sync')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Sync Status to Asset Portal')).toBeVisible();
