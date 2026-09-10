@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
@@ -15,7 +15,28 @@ export default function RequestDetailView({ id, api, navigate }) {
   const [record, setRecord] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchRecord = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (quiet) setRefreshing(true);
+      else setLoading(true);
+      setError('');
+      try {
+        setRecord(await api.getRequest(id));
+      } catch (problem) {
+        setError(
+          problem.status === 404
+            ? 'This request could not be found. Check the request number and try again.'
+            : problem.message,
+        );
+      } finally {
+        if (quiet) setRefreshing(false);
+        else setLoading(false);
+      }
+    },
+    [id, api],
+  );
 
   useEffect(() => {
     let active = true;
@@ -37,10 +58,22 @@ export default function RequestDetailView({ id, api, navigate }) {
       .finally(() => {
         if (active) setLoading(false);
       });
+
+    // Once Zendesk is linked, silently refresh so a status change made by an
+    // agent appears on the tracking page without a browser reload.
+    const timer = window.setInterval(() => {
+      if (active) {
+        api.getRequest(id).then((value) => {
+          if (active) setRecord(value);
+        }).catch(() => {});
+      }
+    }, 10000);
+
     return () => {
       active = false;
+      window.clearInterval(timer);
     };
-  }, [id, api, attempt]);
+  }, [id, api]);
 
   return (
     <>
@@ -67,7 +100,7 @@ export default function RequestDetailView({ id, api, navigate }) {
           </p>
           <button
             className="button secondary"
-            onClick={() => setAttempt(attempt + 1)}
+            onClick={() => fetchRecord()}
           >
             Try again
           </button>
@@ -105,7 +138,17 @@ export default function RequestDetailView({ id, api, navigate }) {
             </section>
             <section className="panel">
               <p className="eyebrow">HELPDESK CONNECTION</p>
-              <h2>Zendesk synchronisation</h2>
+              <div className="panel-heading">
+                <h2>Zendesk synchronisation</h2>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => fetchRecord({ quiet: true })}
+                  disabled={refreshing}
+                >
+                  {refreshing ? 'Refreshing…' : 'Refresh status'}
+                </button>
+              </div>
               <dl className="stacked-details">
                 <div>
                   <dt>Ticket</dt>
@@ -132,7 +175,12 @@ export default function RequestDetailView({ id, api, navigate }) {
                   <dd>{formatDate(record.zendesk_last_synced_at)}</dd>
                 </div>
               </dl>
-              {!record.zendesk_ticket_id && (
+              {record.zendesk_ticket_id ? (
+                <p className="muted">
+                  Zendesk status changes are pushed back to this portal. This page also
+                  checks for fresh data every 10 seconds while it is open.
+                </p>
+              ) : (
                 <p className="muted">
                   Your request is saved. Ticket creation is pending.
                 </p>
