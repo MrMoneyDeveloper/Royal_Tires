@@ -1,3 +1,5 @@
+import hashlib
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,10 +23,23 @@ def _translate(error: zendesk_service.ZendeskError) -> HTTPException:
     return HTTPException(status_code=error.status_code, detail=str(error))
 
 
+def _plan_fingerprint(plan: list[dict]) -> str:
+    """Bind approval to the exact read-only plan the admin reviewed."""
+    canonical = json.dumps(plan, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _with_plan_fingerprint(status: dict) -> dict:
+    status = dict(status)
+    status["plan_fingerprint"] = _plan_fingerprint(status.get("plan") or [])
+    return status
+
+
 @router.get("/setup", response_model=ZendeskSetupStatus)
 def get_setup(db: Database, request: Request):
     try:
-        return zendesk_service.get_setup_status(db, request.app.state.settings)
+        status = zendesk_service.get_setup_status(db, request.app.state.settings)
+        return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
 
@@ -32,13 +47,14 @@ def get_setup(db: Database, request: Request):
 @router.post("/connect", response_model=ZendeskSetupStatus)
 def connect(data: ZendeskConnectRequest, db: Database, request: Request):
     try:
-        return zendesk_service.connect(
+        status = zendesk_service.connect(
             db,
             request.app.state.settings,
             data.subdomain,
             str(data.email),
             data.api_token.get_secret_value(),
         )
+        return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
 
@@ -51,6 +67,20 @@ def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
             detail="Explicit confirmation is required before Zendesk configuration is changed.",
         )
     try:
-        return zendesk_service.apply_setup(db, request.app.state.settings)
+        # Re-read Zendesk immediately before mutation and refuse to deploy if the
+        # current plan no longer matches the exact preview the admin approved.
+        current = zendesk_service.get_setup_status(db, request.app.state.settings)
+        current_fingerprint = _plan_fingerprint(current.get("plan") or [])
+        if data.plan_fingerprint != current_fingerprint:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Zendesk configuration changed after the preview was generated. "
+                    "Refresh the dry-run plan, review it again, then re-approve deployment."
+                ),
+            )
+
+        status = zendesk_service.apply_setup(db, request.app.state.settings)
+        return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
