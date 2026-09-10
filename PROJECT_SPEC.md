@@ -22,13 +22,14 @@ The application must:
 5. prevent SQL injection and unsafe HTML rendering;
 6. keep technical logs and a durable audit table;
 7. integrate with a real Zendesk sandbox;
-8. safely configure the required Zendesk objects through an authenticated setup wizard;
-9. create Zendesk tickets only after the local request is durably committed;
-10. store the Zendesk ticket ID and sync state;
-11. later support Zendesk webhook status updates and manual reconciliation;
-12. provide an operations dashboard;
-13. expose Swagger/OpenAPI;
-14. use GitHub branches, pull requests and CI.
+8. safely configure the required Zendesk objects through a governed setup screen;
+9. keep Zendesk credentials server-side in environment variables;
+10. create Zendesk tickets only after the local request is durably committed;
+11. store the Zendesk ticket ID and sync state;
+12. later support Zendesk webhook status updates and manual reconciliation;
+13. provide an operations dashboard;
+14. expose Swagger/OpenAPI;
+15. use GitHub branches, pull requests and CI.
 
 This remains a **small monolithic application**. Do not introduce microservices, queues, Kubernetes, Terraform, Redis or other infrastructure that the interview requirement does not justify.
 
@@ -60,6 +61,7 @@ This remains a **small monolithic application**. Do not introduce microservices,
 │ Services                     │
 │ Security                     │
 │ Audit logging                │
+│ Zendesk env credentials      │
 └─────────┬───────────┬────────┘
           │           │
           ▼           ▼
@@ -95,7 +97,7 @@ Local development may use SQLite through the same SQLAlchemy models.
 - Login
 - Request form
 - Request tracking
-- Zendesk setup wizard
+- Zendesk setup
 - Dashboard
 
 **Controller**
@@ -109,7 +111,7 @@ Local development may use SQLite through the same SQLAlchemy models.
 **Service layer**
 
 - request creation
-- Zendesk credential testing
+- Zendesk environment credential testing
 - Zendesk discovery
 - setup planning
 - configuration apply/verification
@@ -137,7 +139,7 @@ Controllers should remain thin.
 | Helpdesk simulation | Real Zendesk sandbox |
 | API documentation | Swagger/OpenAPI |
 | Reliability | Local request committed before Zendesk |
-| Integration governance | Connect → discover → dry run → confirm → apply → verify |
+| Integration governance | Env credentials → test → discover → dry run → approve → apply → verify |
 
 ---
 
@@ -162,48 +164,33 @@ Allowed assets:
 - Docking Station
 - Other
 
-Successful submission shows:
-
-- local request ID
-- internal status
-- Zendesk ticket ID when available
-- Zendesk sync state
-- link to request tracking
+Successful submission shows local request ID, internal status, Zendesk ticket ID when available and Zendesk sync state.
 
 A Zendesk outage must never lose the local request.
 
 ## `/requests/:id`
 
-Display:
-
-- local request ID
-- requester
-- asset
-- reason
-- internal status
-- Zendesk ticket ID
-- Zendesk status
-- last Zendesk sync
-- created / updated timestamps
+Display local request details, Zendesk ticket ID/status, sync status and timestamps.
 
 A later phase adds **Refresh from Zendesk**.
 
 ## `/zendesk-setup`
 
-Authenticated administration page for connecting and configuring a Zendesk sandbox safely.
+Authenticated administration page. It does **not** accept Zendesk credentials from the browser.
 
-This page is part of PR5 and is a deliberate extension of the interview requirement.
+It only:
+
+1. shows whether required server-side Zendesk environment variables are present;
+2. tests the environment-held credentials;
+3. discovers existing Zendesk configuration;
+4. shows CREATE/REUSE actions;
+5. requires explicit approval;
+6. applies the approved configuration;
+7. verifies the result.
 
 ## `/dashboard`
 
-Later operations view containing:
-
-- total requests
-- status totals
-- asset breakdown
-- recent requests
-- Zendesk sync failures
-- last successful sync
+Later operations view containing totals, status breakdowns, recent requests and Zendesk sync health.
 
 ---
 
@@ -226,8 +213,6 @@ Authorization: Basic <encoded-credentials>
 
 No user database, JWT, password reset, registration or OAuth provider is required.
 
-Production discussion may reference Entra ID / OIDC / SSO as the next step, but it is outside this practical.
-
 ---
 
 # 7. Security Rules
@@ -246,19 +231,18 @@ React renders user-controlled values as normal text.
 dangerouslySetInnerHTML
 ```
 
-No raw user HTML is intentionally rendered.
-
 ## Secrets
 
-Never commit:
+Never commit or expose:
 
 - Basic Auth password
 - database password
 - Zendesk API token
-- encryption key
 - webhook secret
 
-Never log request Authorization headers or Zendesk tokens.
+Never log Authorization headers or Zendesk API tokens.
+
+Zendesk credentials remain on the FastAPI/Render side only.
 
 ---
 
@@ -307,13 +291,12 @@ MANUAL_SYNC_FAILED
 
 ## `zendesk_connection`
 
-Singleton configuration record for the demo portal.
+This table stores verified Zendesk metadata and managed object IDs only.
 
 ```text
 id
 subdomain
 api_email
-encrypted_api_token
 connected_user_name
 connected_user_email
 connected_user_role
@@ -329,54 +312,54 @@ configured_at
 verified_at
 ```
 
-The API token must be encrypted before it is stored in SQL.
+**The Zendesk API token is not stored in PostgreSQL.** It stays in the Render environment.
 
 ---
 
-# 9. Zendesk Credential Architecture
+# 9. Zendesk Credential Architecture — ENV METHOD
 
-**Do not store the Zendesk domain, email and API token directly as Render environment variables.**
-
-The administrator enters them through the authenticated Zendesk setup page.
-
-The backend retains only a server-side root secret in Render:
+Zendesk credentials are configured in the backend environment:
 
 ```env
-CONFIG_ENCRYPTION_KEY=
+ZENDESK_SUBDOMAIN=digify7
+ZENDESK_EMAIL=<zendesk-admin-email>
+ZENDESK_API_TOKEN=<secret-token>
 ```
+
+The frontend never receives these values.
 
 Flow:
 
 ```text
-Authenticated portal user
+Render environment
         ↓
-Zendesk setup form
-        ↓ HTTPS
+FastAPI settings
+        ↓
 POST /api/zendesk/connect
         ↓
 GET Zendesk /api/v2/users/me.json
         ↓
-Credentials accepted
+Credentials valid
         ↓
-Encrypt API token server-side
+Store only safe connection metadata in PostgreSQL
         ↓
-Store encrypted token + instance/user metadata in PostgreSQL
+Discover existing Zendesk configuration
         ↓
-Never return token to browser
+Return dry-run plan to browser
 ```
 
-Changing `CONFIG_ENCRYPTION_KEY` invalidates the stored encrypted token and requires reconnecting Zendesk.
+Changing Zendesk environment credentials requires re-testing the connection before configuration can be applied or tickets created.
 
 ---
 
 # 10. Zendesk Safe Setup Workflow
 
-This workflow is based on the configuration-management pattern already used in CX Experts Zendesk tooling:
+This follows the same controlled deployment pattern used in the AI Site Factory / Zendesk configuration tooling: read first, stage a plan, require human approval, then perform the external action.
 
 ```text
-CONNECT
+ENV CREDENTIALS
    ↓
-TEST CREDENTIALS
+TEST CONNECTION
    ↓
 READ EXISTING CONFIGURATION
    ↓
@@ -384,24 +367,30 @@ BUILD DRY-RUN PLAN
    ↓
 DISPLAY CREATE / REUSE ACTIONS
    ↓
-EXPLICIT USER CONFIRMATION
+GENERATE PLAN FINGERPRINT
    ↓
-APPLY
+EXPLICIT USER APPROVAL
    ↓
-READ BACK
+RE-READ ZENDESK
    ↓
-VERIFY AFTER
+COMPARE CURRENT PLAN TO APPROVED FINGERPRINT
+   ├─ changed → STOP / 409 / review again
+   └─ same    → APPLY
+                  ↓
+               READ BACK
+                  ↓
+               VERIFY AFTER
 ```
 
-**The connection test and dry run must not mutate Zendesk.**
+**Connection testing and dry-run discovery are read-only.**
 
-The application should never blindly push configuration on login.
+No Brand, Group, Field, Form or View is created until the authenticated user clicks **Apply configuration** after reviewing the exact plan.
 
 ---
 
 # 11. Zendesk Discovery
 
-After credentials are validated, the backend reads current Zendesk configuration through the API.
+After the environment credentials are validated, the backend reads current Zendesk configuration through the API.
 
 Required discovery endpoints:
 
@@ -414,17 +403,15 @@ GET /api/v2/ticket_forms.json
 GET /api/v2/views.json
 ```
 
-Discovery should follow pagination where present.
+Discovery follows pagination where present.
 
 Objects are matched by exact Royal Tyres names so repeated setup is idempotent.
 
-Unrelated Zendesk configuration must not be deleted.
+Unrelated Zendesk configuration must never be deleted.
 
 ---
 
 # 12. Required Zendesk Configuration
-
-The setup wizard owns the following small configuration set.
 
 ## Brand
 
@@ -432,9 +419,7 @@ The setup wizard owns the following small configuration set.
 Royal Tyres
 ```
 
-If the exact brand already exists, reuse it.
-
-If missing, create it with a sandbox-safe subdomain derived from the connected sandbox name.
+Reuse an exact existing Brand or create it.
 
 ## Group
 
@@ -442,7 +427,7 @@ If missing, create it with a sandbox-safe subdomain derived from the connected s
 Royal Tyres | IT Service Desk
 ```
 
-If present, reuse it. Otherwise create it.
+Reuse an exact existing Group or create it.
 
 ## Custom ticket fields
 
@@ -452,9 +437,7 @@ If present, reuse it. Otherwise create it.
 RT | Asset Type
 ```
 
-Type: dropdown
-
-Values:
+Dropdown values:
 
 ```text
 Laptop          -> laptop
@@ -480,9 +463,7 @@ Type: text
 RT | Request Source
 ```
 
-Type: dropdown
-
-Value:
+Dropdown value:
 
 ```text
 Royal Tyres Asset Portal -> royal_tires_asset_portal
@@ -494,9 +475,7 @@ Royal Tyres Asset Portal -> royal_tires_asset_portal
 Royal Tyres | IT Asset Request
 ```
 
-The form is agent-side for the demo and contains the three Royal Tyres custom fields.
-
-Where supported, restrict the form to the Royal Tyres brand.
+Agent-side demo form containing the three Royal Tyres fields and restricted to the Royal Tyres Brand where supported.
 
 ## View
 
@@ -504,61 +483,46 @@ Where supported, restrict the form to the Royal Tyres brand.
 Royal Tyres | IT Asset Requests
 ```
 
-The View should select tickets assigned to the Royal Tyres IT Service Desk group and carrying the portal tag.
+The View filters tickets assigned to the Royal Tyres IT Service Desk Group and carrying `royal_tires_asset_portal`.
 
-The app does not assign a View directly to a ticket. Zendesk Views are filters over ticket conditions.
+The app does not assign a View directly to tickets. Zendesk Views are filters.
 
 ---
 
-# 13. Dry-Run Plan
+# 13. Dry-Run Plan and Approval Fingerprint
 
-After connection, show a plan similar to:
-
-```text
-Zendesk connected ✓
-Instance: digify7.zendesk.com
-User: <connected admin>
-
-Brand
-CREATE   Royal Tyres
-
-Group
-CREATE   Royal Tyres | IT Service Desk
-
-Ticket field
-CREATE   RT | Asset Type
-
-Ticket field
-CREATE   RT | Local Request ID
-
-Ticket field
-CREATE   RT | Request Source
-
-Ticket form
-CREATE   Royal Tyres | IT Asset Request
-
-View
-CREATE   Royal Tyres | IT Asset Requests
-```
-
-If an exact object already exists:
+After connection, show a plan such as:
 
 ```text
-REUSE   #<zendesk-id>
+Brand         CREATE  Royal Tyres
+Group         CREATE  Royal Tyres | IT Service Desk
+Ticket field  CREATE  RT | Asset Type
+Ticket field  CREATE  RT | Local Request ID
+Ticket field  CREATE  RT | Request Source
+Ticket form   CREATE  Royal Tyres | IT Asset Request
+View          CREATE  Royal Tyres | IT Asset Requests
 ```
 
-No mutation occurs while this plan is displayed.
+Existing exact objects display:
+
+```text
+REUSE #<zendesk-id>
+```
+
+The backend calculates a SHA-256 fingerprint from the exact plan shown to the administrator.
+
+No mutation occurs while the plan is displayed.
 
 ---
 
 # 14. Explicit Apply Confirmation
 
-The administrator must explicitly confirm before mutation.
+The administrator must explicitly approve the exact displayed plan.
 
-Frontend wording should make the effect clear:
+Frontend wording:
 
 ```text
-I reviewed the dry-run plan. Create only the missing Royal Tyres configuration and do not delete unrelated Zendesk data.
+I reviewed this exact dry-run plan. Create only the missing Royal Tyres configuration and do not delete unrelated Zendesk data.
 ```
 
 API:
@@ -571,13 +535,14 @@ Body:
 
 ```json
 {
-  "confirm": true
+  "confirm": true,
+  "plan_fingerprint": "<sha256>"
 }
 ```
 
-The backend rejects the apply request if confirmation is false or absent.
+Immediately before mutation, FastAPI re-reads Zendesk and rebuilds the plan. If its fingerprint differs from the reviewed plan, return HTTP 409 and require a new review.
 
-The connected Zendesk user must be an admin for configuration creation.
+The configured Zendesk API user must be an admin.
 
 ---
 
@@ -593,21 +558,31 @@ exact Royal Tyres object exists?
     └─ no  → CREATE object
 ```
 
-The apply operation must:
+Apply order:
 
-- create only missing Royal Tyres objects;
-- reuse exact existing Royal Tyres objects;
-- never delete unrelated objects;
-- avoid duplicate Royal Tyres objects when rerun;
-- tolerate a partially completed prior run by rediscovering before each ensure operation.
+```text
+Brand
+  ↓
+Group
+  ↓
+Asset Type field
+  ↓
+Local Request ID field
+  ↓
+Request Source field
+  ↓
+Ticket Form
+  ↓
+View
+```
 
-A later hardening phase may add controlled UPDATE behaviour for exact portal-owned objects if required. It is not needed merely to demonstrate safe provisioning.
+The apply operation must create only missing Royal Tyres objects, reuse exact existing objects, avoid duplicates, tolerate a partial prior run and never delete unrelated configuration.
 
 ---
 
 # 16. Verify After
 
-After apply, read each resulting object back from Zendesk by ID.
+After apply, read every resulting object back from Zendesk by ID.
 
 Verify:
 
@@ -621,7 +596,7 @@ Ticket form          PASS / FAIL
 View                 PASS / FAIL
 ```
 
-Only after verification succeeds should the connection be considered configured.
+Only after all managed objects verify successfully should the integration be considered configured.
 
 Persist the verified Zendesk IDs in `zendesk_connection`.
 
@@ -629,7 +604,7 @@ Persist the verified Zendesk IDs in `zendesk_connection`.
 
 # 17. Zendesk Setup API
 
-All three endpoints require the portal Basic Auth.
+All endpoints require portal Basic Auth.
 
 ## Status / plan
 
@@ -637,42 +612,23 @@ All three endpoints require the portal Basic Auth.
 GET /api/zendesk/setup
 ```
 
-Returns:
+Returns environment presence, connection state, connected instance/user summary, dry-run plan, plan fingerprint, stored object IDs and verification results. It never returns the Zendesk token.
 
-- connection state
-- connected instance
-- connected Zendesk user summary
-- whether the user can configure
-- dry-run plan
-- stored object IDs
-- verification results where available
-
-Never returns the Zendesk token.
-
-## Connect
+## Test environment connection
 
 ```text
 POST /api/zendesk/connect
 ```
 
-Request:
-
-```json
-{
-  "subdomain": "digify7",
-  "email": "admin@example.com",
-  "api_token": "<secret>"
-}
-```
+No request body is required.
 
 Actions:
 
-1. normalise the domain/subdomain;
-2. test `/users/me`;
-3. encrypt the token;
-4. store connection metadata;
-5. discover current configuration;
-6. return the dry-run plan.
+1. read `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` from backend settings;
+2. validate `/users/me`;
+3. store safe connection metadata only;
+4. discover current configuration;
+5. return the dry-run plan and fingerprint.
 
 No Zendesk configuration is changed.
 
@@ -682,7 +638,7 @@ No Zendesk configuration is changed.
 POST /api/zendesk/apply
 ```
 
-Requires explicit confirmation, creates/reuses managed configuration, reads it back and returns verification.
+Requires explicit confirmation and the reviewed plan fingerprint. It creates/reuses managed configuration, reads it back and returns verification.
 
 ---
 
@@ -724,9 +680,9 @@ Zendesk failure must never roll back the already committed request.
 
 # 19. Zendesk Ticket Creation
 
-Only use IDs saved by the verified setup flow.
+Ticket creation uses backend environment credentials plus verified IDs saved in SQL.
 
-Ticket payload includes:
+Payload includes:
 
 ```text
 subject
@@ -741,32 +697,15 @@ tags
 priority
 ```
 
-Example subject:
+Example:
 
 ```text
-IT Asset Request #27 - Laptop - Mohammed Farhaan Buckas
-```
-
-External ID:
-
-```text
-royal-tires-asset-27
-```
-
-Tags:
-
-```text
-it_asset_request
-royal_tires_asset_portal
-local_request_27
-```
-
-Custom fields:
-
-```text
-RT | Asset Type        = laptop
-RT | Local Request ID  = 27
-RT | Request Source    = royal_tires_asset_portal
+Subject: IT Asset Request #27 - Laptop - Mohammed Farhaan Buckas
+External ID: royal-tires-asset-27
+Tags: it_asset_request, royal_tires_asset_portal, local_request_27
+RT | Asset Type = laptop
+RT | Local Request ID = 27
+RT | Request Source = royal_tires_asset_portal
 ```
 
 Store returned Zendesk values:
@@ -778,67 +717,26 @@ zendesk_sync_status = synced
 zendesk_last_synced_at
 ```
 
-On failure:
-
-```text
-zendesk_ticket_id = null
-zendesk_sync_status = sync_failed
-```
-
-and preserve the local request.
+On Zendesk failure, preserve the local request and set `zendesk_sync_status = sync_failed`.
 
 ---
 
-# 20. Zendesk Webhook — Later PR
+# 20. Later Zendesk Sync
 
-Primary future status-sync endpoint:
+Future PR6:
 
 ```text
 POST /api/webhooks/zendesk
-```
-
-Use a shared secret for the interview version:
-
-```env
-ZENDESK_WEBHOOK_SECRET=
-```
-
-Expected flow:
-
-```text
-Zendesk ticket status changes
-        ↓
-Zendesk trigger
-        ↓
-Webhook to Render FastAPI
-        ↓
-Validate secret
-        ↓
-Locate local request
-        ↓
-Update Zendesk/local status fields
-        ↓
-Audit event
-```
-
-Do not expose the portal Basic Auth credentials to Zendesk.
-
----
-
-# 21. Manual Reconciliation — Later PR
-
-```text
 POST /api/requests/{id}/sync
 ```
 
-Use the stored encrypted Zendesk connection and ticket ID to read current Zendesk state and repair a missed webhook event.
+Webhook is the primary event-driven path. Manual reconciliation is the recovery path.
 
-Webhook = primary event-driven path.  
-Manual sync = recovery path.
+Use `ZENDESK_WEBHOOK_SECRET` for the interview webhook version.
 
 ---
 
-# 22. Core API Endpoints
+# 21. Core API Endpoints
 
 ```text
 GET  /health
@@ -855,64 +753,39 @@ POST /api/webhooks/zendesk          # later
 GET  /api/dashboard/summary         # later
 ```
 
-Swagger remains available at:
-
-```text
-/docs
-```
+Swagger remains available at `/docs`.
 
 ---
 
-# 23. Logging
+# 22. Logging
 
-Technical logs may include:
+Technical logs may include HTTP method, route, status code, request ID, event type and Zendesk operation result.
 
-```text
-HTTP method
-route
-status code
-request ID
-event type
-Zendesk operation result
-```
-
-Do not log:
-
-```text
-APP_PASSWORD
-Authorization header
-Zendesk API token
-CONFIG_ENCRYPTION_KEY
-webhook secret
-```
+Do not log passwords, Authorization headers, Zendesk API tokens or webhook secrets.
 
 The audit table remains separate from operational logs.
 
 ---
 
-# 24. CORS
+# 23. CORS
 
-Hosted frontend and backend use different origins.
-
-Current production origin:
+Production frontend:
 
 ```text
 https://royal-tires.vercel.app
 ```
 
-Current backend:
+Backend:
 
 ```text
 https://royal-tires-api.onrender.com
 ```
 
-`FRONTEND_URL` must explicitly allow production and local development origins.
-
-Do not use wildcard CORS in the final demo.
+`FRONTEND_URL` must explicitly allow production and local development origins. Do not use wildcard CORS in the final demo.
 
 ---
 
-# 25. Environment Variables
+# 24. Environment Variables
 
 Backend:
 
@@ -921,13 +794,13 @@ APP_USERNAME=
 APP_PASSWORD=
 DATABASE_URL=
 FRONTEND_URL=
-CONFIG_ENCRYPTION_KEY=
+ZENDESK_SUBDOMAIN=
+ZENDESK_EMAIL=
+ZENDESK_API_TOKEN=
 ZENDESK_WEBHOOK_SECRET=
 ```
 
-**No Zendesk API token is required in Render environment variables.**
-
-Zendesk credentials are entered through `/zendesk-setup` and encrypted server-side.
+`ZENDESK_WEBHOOK_SECRET` is only needed when PR6 is implemented.
 
 Frontend:
 
@@ -939,7 +812,7 @@ No server secret may be stored in a Vite environment variable.
 
 ---
 
-# 26. Deployment State and Next Order
+# 25. Deployment State and Next Order
 
 Base hosting is already established:
 
@@ -951,27 +824,25 @@ Hosted request create   ✓
 Hosted request tracking ✓
 ```
 
-Before merging the Zendesk setup branch:
+PR5 deployment order:
 
-1. add a long random `CONFIG_ENCRYPTION_KEY` to Render;
+1. configure `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` on the Render backend;
 2. confirm PR5 CI passes;
 3. merge PR5;
 4. allow Render and Vercel auto-deploy;
-5. sign into the portal;
-6. open **Zendesk setup**;
-7. enter sandbox domain/email/token;
-8. Test & Connect;
-9. inspect the dry-run plan;
-10. explicitly confirm Apply;
-11. verify all managed Zendesk objects return PASS;
+5. sign into the Royal Tyres portal;
+6. open **Zendesk Setup**;
+7. click **Test environment connection**;
+8. inspect CREATE/REUSE dry-run plan;
+9. tick explicit approval;
+10. click **Apply configuration**;
+11. verify Brand, Group, Fields, Form and View all return PASS;
 12. create a new asset request;
-13. confirm the real Zendesk ticket uses the correct brand, group, form and custom fields.
+13. confirm the real Zendesk ticket uses the correct Brand, Group, Form and custom fields.
 
 ---
 
-# 27. Git / Pull Request Sequence
-
-Completed / current sequence:
+# 26. Git / Pull Request Sequence
 
 ```text
 PR1  chore/project-scaffold       ✓
@@ -981,42 +852,35 @@ PR4  feat/request-ui              ✓
 PR5  feat/zendesk-integration     CURRENT / DRAFT
 PR6  feat/zendesk-sync            later
 PR7  feat/operations-dashboard    later
-PR8  chore/deployment             mostly completed manually during build
+PR8  chore/deployment             mostly completed manually
 PR9  chore/final-hardening        later
 ```
 
-## PR5 — Zendesk Integration
+PR5 scope:
 
-PR5 now includes more than basic ticket creation.
-
-Required PR5 scope:
-
-- `zendesk_connection` SQL model;
-- server-side token encryption;
-- Zendesk Test & Connect flow;
-- `/users/me` credential validation;
-- current config discovery;
-- dry-run CREATE / REUSE plan;
-- explicit apply confirmation;
-- idempotent Brand creation/reuse;
-- idempotent Group creation/reuse;
-- idempotent custom Field creation/reuse;
-- idempotent Ticket Form creation/reuse;
-- idempotent View creation/reuse;
+- server-side Zendesk env credentials;
+- env connection test;
+- `/users/me` validation;
+- configuration discovery;
+- dry-run CREATE/REUSE plan;
+- reviewed-plan SHA-256 fingerprint;
+- explicit confirmation;
+- stale-plan rejection;
+- idempotent Brand, Group, Field, Form and View create/reuse;
 - post-apply verification;
-- persisted Zendesk IDs;
+- persisted safe metadata/object IDs;
 - ticket creation using those IDs;
 - Zendesk failure isolation;
 - tests;
 - authenticated React Zendesk setup view.
 
-Do not merge PR5 merely because the simple ticket-creation code works. Merge only when the setup workflow and tests are ready.
+Do not merge PR5 until CI passes.
 
 ---
 
-# 28. CI
+# 27. CI
 
-GitHub Actions should run on pull requests and main.
+GitHub Actions run on pull requests and main.
 
 Backend:
 
@@ -1039,7 +903,7 @@ Do not merge failing CI.
 
 ---
 
-# 29. Testing Requirements
+# 28. Testing Requirements
 
 Minimum important behaviours:
 
@@ -1049,27 +913,25 @@ Minimum important behaviours:
 4. validation rejects invalid input;
 5. SQL injection-like input remains harmless data;
 6. React renders malicious-looking HTML as text;
-7. Zendesk Connect validates `/users/me` before storing connection;
-8. stored Zendesk token is encrypted, not plaintext;
-9. Zendesk Connect does not mutate configuration;
-10. Apply rejects missing/false confirmation;
-11. Apply stores managed object IDs;
-12. post-apply verification succeeds for created/reused objects;
-13. ticket creation uses verified configuration IDs;
-14. Zendesk ticket creation success stores ticket ID;
-15. Zendesk failure preserves the local request;
-16. later webhook secret validation;
-17. later manual reconciliation;
+7. Zendesk setup reports missing env credentials safely;
+8. Zendesk Connect reads credentials from backend environment only;
+9. `/users/me` is validated before connection metadata is accepted;
+10. Zendesk Connect does not mutate configuration;
+11. Apply rejects missing/false confirmation;
+12. Apply rejects a stale plan fingerprint;
+13. Apply stores managed object IDs;
+14. post-apply verification succeeds for created/reused objects;
+15. ticket creation uses verified configuration IDs;
+16. Zendesk ticket creation success stores ticket ID;
+17. Zendesk failure preserves the local request;
 18. frontend production build passes;
 19. desktop/mobile browser tests pass.
 
 ---
 
-# 30. Demo Scenario
+# 29. Demo Scenario
 
 ## Demo A — Base request
-
-Create an asset request and show:
 
 ```text
 React validation
@@ -1079,17 +941,17 @@ React validation
 → request tracking
 ```
 
-## Demo B — Zendesk configuration governance
-
-Show:
+## Demo B — Governed Zendesk configuration
 
 ```text
-Zendesk Setup
-→ Test & Connect
+Render env credentials
+→ Zendesk Setup
+→ Test environment connection
 → connected admin identity
 → current config discovery
 → CREATE / REUSE dry-run plan
-→ confirmation checkbox
+→ plan fingerprint
+→ human approval
 → Apply configuration
 → VERIFY AFTER PASS results
 ```
@@ -1105,78 +967,76 @@ RT | Local Request ID
 RT | Request Source
 ```
 
-This is a stronger demonstration than manually pasting object IDs into environment variables because the application discovers and governs its own small integration configuration.
-
 ## Demo C — Later two-way sync
 
 Change Zendesk ticket status and demonstrate webhook/manual reconciliation once PR6 exists.
 
 ---
 
-# 31. Interview Explanation
+# 30. Interview Explanation
 
-A useful concise explanation:
-
-> PostgreSQL is the primary system of record, so the employee request is committed before any Zendesk call. Zendesk is treated as a secondary business-system integration. Instead of hardcoding sandbox IDs, the authenticated setup page tests the Zendesk login, discovers existing configuration, creates a dry-run plan, requires explicit confirmation, creates only missing Royal Tyres objects, verifies them after creation, and stores the resulting IDs. The API token is encrypted server-side and is never returned to the browser.
+> PostgreSQL is the primary system of record, so the employee request is committed before any Zendesk call. Zendesk credentials are held only in the Render backend environment. The setup screen tests those server-side credentials, discovers the live Zendesk configuration and creates a read-only CREATE/REUSE plan. The plan is fingerprinted and must be explicitly approved. Immediately before applying, the backend re-reads Zendesk and rejects the operation if the plan changed. It then creates only missing Royal Tyres objects, verifies them after creation and stores the resulting IDs for ticket creation.
 
 Trade-offs:
 
 - Basic Auth is intentionally simple because it was explicitly requested.
 - The app is monolithic because the scope does not justify microservices.
-- Automatic retries/background jobs are deferred to avoid unnecessary infrastructure.
-- Configuration UPDATE/rollback can be added later; PR5 initially manages CREATE/REUSE only for exact portal-owned names.
+- Zendesk API-token auth is appropriate for the sandbox demo; OAuth would be preferable in a production multi-tenant product.
+- Automatic retries/background jobs are deferred.
 - The local database remains authoritative when Zendesk is unavailable.
 
 ---
 
-# 32. Production Improvements
+# 31. Production Improvements
 
 If this moved beyond the interview demo:
 
 - Entra ID / OIDC / SSO;
 - role-based admin permissions;
-- formal database migrations such as Alembic;
-- key management service rather than one Render secret;
-- Zendesk OAuth instead of API-token auth;
+- Alembic database migrations;
+- managed secret store / key vault;
+- Zendesk OAuth;
 - webhook signing where supported;
-- background retry queue for sync failures;
-- centralised structured logging and alerting;
+- background retry queue;
+- structured monitoring and alerting;
 - configuration backup/rollback;
 - approval workflow;
 - asset inventory integration.
 
 ---
 
-# 33. Implementation Rules
+# 32. Implementation Rules
 
 1. Treat this file as the source of truth.
 2. Keep architecture simple and readable.
 3. Do not remove Basic Auth.
 4. Do not hardcode secrets or Zendesk IDs.
 5. Do not commit `.env` files.
-6. Do not expose Zendesk API tokens to the frontend after submission.
-7. Encrypt the token before storing it in SQL.
-8. Test credentials before saving/using them.
+6. Keep Zendesk credentials server-side in environment variables.
+7. Never return the Zendesk API token to the frontend.
+8. Test credentials before using them.
 9. Discovery and dry-run operations are read-only.
-10. Require explicit confirmation before Zendesk configuration mutation.
-11. Create/reuse only exact Royal Tyres managed objects.
-12. Never delete unrelated Zendesk configuration.
-13. Verify objects after apply.
-14. Store discovered/created IDs in SQL.
-15. Commit the asset request before any Zendesk ticket call.
-16. Zendesk failure must not lose the request.
-17. Use SQLAlchemy and Pydantic.
-18. Keep controllers thin and business logic in services.
-19. Use React safe text rendering.
-20. Never use `dangerouslySetInnerHTML`.
-21. Keep `/health` public.
-22. Keep Swagger available.
-23. Run CI before merge.
-24. Prefer understandable code over clever abstractions.
+10. Require explicit confirmation before Zendesk mutation.
+11. Bind approval to the exact reviewed plan fingerprint.
+12. Re-read Zendesk before mutation and reject stale plans.
+13. Create/reuse only exact Royal Tyres managed objects.
+14. Never delete unrelated Zendesk configuration.
+15. Verify objects after apply.
+16. Store discovered/created IDs in SQL.
+17. Commit the asset request before any Zendesk ticket call.
+18. Zendesk failure must not lose the request.
+19. Use SQLAlchemy and Pydantic.
+20. Keep controllers thin and business logic in services.
+21. Use React safe text rendering.
+22. Never use `dangerouslySetInnerHTML`.
+23. Keep `/health` public.
+24. Keep Swagger available.
+25. Run CI before merge.
+26. Prefer understandable code over clever abstractions.
 
 ---
 
-# 34. Definition of Done
+# 33. Definition of Done
 
 Base application:
 
@@ -1192,13 +1052,17 @@ Base application:
 
 PR5:
 
-- [ ] Render has `CONFIG_ENCRYPTION_KEY`
+- [ ] Render has `ZENDESK_SUBDOMAIN`
+- [ ] Render has `ZENDESK_EMAIL`
+- [ ] Render has `ZENDESK_API_TOKEN`
 - [ ] Zendesk setup page loads
-- [ ] Zendesk credentials can be tested
-- [ ] API token is encrypted in SQL
+- [ ] backend env credentials can be tested
+- [ ] browser never receives Zendesk credentials
 - [ ] current Brand/Group/Fields/Form/View are discovered
 - [ ] dry-run plan shows CREATE/REUSE
+- [ ] plan fingerprint is generated
 - [ ] Apply requires explicit confirmation
+- [ ] stale approved plan is rejected
 - [ ] Brand is created/reused
 - [ ] Group is created/reused
 - [ ] three custom fields are created/reused
@@ -1220,7 +1084,7 @@ Later:
 
 ---
 
-# 35. Final Principle
+# 34. Final Principle
 
 ```text
 Operational problem
@@ -1233,17 +1097,19 @@ Validated input
         ↓
 Durable persistence
         ↓
-Controlled external configuration
+Server-side secrets
         ↓
-Explicit confirmation
+Read-only discovery
         ↓
-Verified integration
+Human-approved plan
+        ↓
+Controlled external change
+        ↓
+Verification
         ↓
 Auditability
         ↓
 Recoverable failure
 ```
 
-The goal is not to build the largest system.
-
-The goal is to build a **small system that works, is safe to operate, can be explained clearly, and demonstrates sound technical judgement**.
+The goal is not to build the largest system. The goal is to build a **small system that works, is safe to operate, can be explained clearly, and demonstrates sound technical judgement**.
