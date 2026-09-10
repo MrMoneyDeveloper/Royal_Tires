@@ -1,3 +1,17 @@
+"""
+ROLE: Application composition root
+CALLED BY: Uvicorn; tests via create_app
+CALLS: Settings, Data package, middleware and Controllers
+DATA IN: Optional typed Settings override
+DATA OUT: FastAPI app, engine and session factory; public health/OpenAPI routes
+WHY: Wire infrastructure once rather than in each business use case.
+SECURITY / RELIABILITY: Lifespan creates missing tables and disposes the engine; create_all is
+    not a migration system. Validation responses omit raw input; unexpected errors expose only
+    a generic response.
+FLOW: Uvicorn; tests via create_app -> this module -> Settings, Data package, middleware and
+    Controllers
+"""
+
 from contextlib import asynccontextmanager
 import logging
 

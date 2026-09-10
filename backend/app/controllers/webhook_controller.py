@@ -1,3 +1,16 @@
+"""
+ROLE: Webhook Controller: inbound status HTTP boundary
+CALLED BY: Zendesk webhook POST /api/webhooks/zendesk
+CALLS: WebhookService, webhook schemas and get_db
+DATA IN: JSON ticket/status identity plus Authorization header
+DATA OUT: Acknowledgement or 401/404/409/503 error
+WHY: Keep authentication and HTTP error translation outside status persistence.
+SECURITY / RELIABILITY: Uses its own bearer secret with constant-time comparison, not portal
+    Basic Auth. Never log the header.
+FLOW: Zendesk webhook POST /api/webhooks/zendesk -> this module -> WebhookService, webhook
+    schemas and get_db
+"""
+
 import hmac
 from typing import Annotated
 

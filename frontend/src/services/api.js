@@ -1,3 +1,16 @@
+/**
+ * ROLE: Frontend HTTP Service
+ * CALLED BY: App login and page Views
+ * CALLS: fetch to the configured FastAPI origin
+ * DATA IN: In-memory portal credentials and request DTOs
+ * DATA OUT: JSON response or ApiError
+ * WHY: Centralize auth headers, timeout and HTTP error handling.
+ * SECURITY / RELIABILITY: Never calls Zendesk. Basic Auth is sent over hosted HTTPS; no
+ *     credential persistence. Default request timeout is 30 seconds, including setup
+ *     operations; a timeout alone does not prove the server stopped.
+ * FLOW: App login and page Views -> this module -> fetch to the configured FastAPI origin
+ */
+
 export class ApiError extends Error {
   constructor(message, status = 0) {
     super(message);

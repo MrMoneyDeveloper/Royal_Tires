@@ -1,3 +1,17 @@
+"""
+ROLE: Opt-in Service for seven confirmed legacy trigger exclusions
+CALLED BY: Zendesk Controller within governed setup
+CALLS: ZendeskService HTTP/discovery helpers
+DATA IN: Settings and discovered Royal Tyres brand ID
+DATA OUT: UPDATE/REUSE/SKIP plan and preservation verification
+WHY: Isolate known sandbox interference without disabling unrelated automation.
+SECURITY / RELIABILITY: Only listed titles may change. Adds Brand IS NOT Royal Tyres and
+    resends existing actions because updating conditions alone can clear actions. Snapshots
+    contribute to the controller plan; read-back compares protected properties.
+FLOW: Zendesk Controller within governed setup -> this module -> ZendeskService HTTP/discovery
+    helpers
+"""
+
 import hashlib
 import json
 from copy import deepcopy
@@ -12,7 +26,7 @@ LEGACY_TRIGGER_TITLES = (
     "Issue Type 6",
     "Request Type 6",
     "Query Type 5",
-    "hello world?",
+    "hello world",
 )
 
 

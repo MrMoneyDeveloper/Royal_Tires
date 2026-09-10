@@ -1,3 +1,17 @@
+"""
+ROLE: Request Service: business sequencing and transaction ownership
+CALLED BY: Request Controller
+CALLS: RequestRepository, AuditRepository, AssetRequest and ZendeskService
+DATA IN: Validated request, injected Session and Settings
+DATA OUT: Committed primary request, audit history and integration state
+WHY: Service decides why and when persistence happens; repositories decide how.
+SECURITY / RELIABILITY: Flush obtains the local ID; commit saves request plus REQUEST_CREATED
+    before Zendesk. Expected ZendeskError leaves the request saved and records sync_failed; no
+    automatic retry is implemented.
+FLOW: Request Controller -> this module -> RequestRepository, AuditRepository, AssetRequest
+    and ZendeskService
+"""
+
 import logging
 
 from sqlalchemy.orm import Session

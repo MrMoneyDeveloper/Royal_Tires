@@ -1,3 +1,16 @@
+"""
+ROLE: AuditLog Model: audit_logs SQL table
+CALLED BY: AuditRepository
+CALLS: Declarative Base; foreign key to asset_requests.id
+DATA IN: Event type/source/message/time and request_id
+DATA OUT: Persisted chronological workflow history in PostgreSQL
+WHY: One AssetRequest can have many audit events for diagnosis and explanation.
+SECURITY / RELIABILITY: id is the audit primary key. request_id is the foreign key linking the
+    event to AssetRequest. AuditLog is NOT authentication or browser-session state; no ORM
+    relationship property is required to enforce the SQL foreign key.
+FLOW: AuditRepository -> this module -> Declarative Base; foreign key to asset_requests.id
+"""
+
 from datetime import datetime
 
 from sqlalchemy import ForeignKey, String

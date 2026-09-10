@@ -1,3 +1,16 @@
+"""
+ROLE: Request Repository: ORM persistence operations
+CALLED BY: RequestService and WebhookService
+CALLS: AssetRequest and the supplied SQLAlchemy Session
+DATA IN: Session, entity, local/ticket ID or pagination
+DATA OUT: Added entity, matching entity or ordered list
+WHY: Encapsulate how add/get/list/ticket lookup are performed.
+SECURITY / RELIABILITY: Receives a Session; does not open its own Internet connection or
+    commit. ORM values are bound parameters, not interpolated SQL.
+FLOW: RequestService and WebhookService -> this module -> AssetRequest and the supplied
+    SQLAlchemy Session
+"""
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

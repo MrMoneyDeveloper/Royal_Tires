@@ -1,3 +1,17 @@
+"""
+ROLE: Setup Schemas: approval and safe response contracts
+CALLED BY: FastAPI Zendesk Controller
+CALLS: Pydantic types, patterns and action literals
+DATA IN: Confirmation/fingerprint or safe setup result
+DATA OUT: Validated apply input and bounded response structure
+WHY: Specify the browser/backend contract without exposing integration credentials.
+SECURITY / RELIABILITY: Apply forbids extra fields and requires a 64-character lowercase hex
+    fingerprint; confirmation itself is checked by the controller. Models persist data; these
+    schemas describe HTTP data.
+FLOW: FastAPI Zendesk Controller -> this module -> Pydantic types, patterns and action
+    literals
+"""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field

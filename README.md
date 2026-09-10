@@ -204,6 +204,186 @@ Employee submits request
 
 The request detail page refreshes its local API data every 10 seconds while open and provides a manual **Refresh status** button. The browser never calls Zendesk directly.
 
+## Interview architecture
+
+Use the [file-by-file interview guide](docs/INTERVIEW_GUIDE.md) to follow imports and responsibilities. The diagrams describe an **MVC-style layered mental model**, not traditional server-rendered ASP.NET MVC. FastAPI validates schema input before invoking a route function; the schema box denotes that boundary, not a second HTTP request.
+
+### 1. System architecture
+
+```mermaid
+flowchart TD
+    U[User] --> F[React / Vite on Render Static Site]
+    F -->|HTTPS / JSON / Basic Auth| B[FastAPI on Render]
+    B --> DB[(Render PostgreSQL)]
+    DB --- Tables[asset_requests / audit_logs / zendesk_connection]
+    B --> Z[Zendesk REST API]
+    Z --> T[Zendesk status-change Trigger]
+    T --> W[Webhook POST JSON with separate Bearer auth]
+    W --> E[FastAPI webhook endpoint]
+    E --> DB
+```
+
+### 2. MVC-style code flow
+
+```mermaid
+flowchart TD
+    V[React View / Component] --> A[Frontend api.js]
+    A --> HTTP
+    subgraph HTTP[FastAPI HTTP processing]
+        MI[Middleware: incoming request] --> C[Controller boundary]
+        C --> P[Pydantic schema validation]
+        P --> S[Service]
+        S --> MO[Middleware: returning response]
+    end
+    S --> R[Repository]
+    R --> M[SQLAlchemy Model]
+    M --> D[Session / Engine]
+    D --> DB[(PostgreSQL)]
+    S --> ZS[ZendeskService]
+    ZS --> Z[Zendesk]
+    Core[Core Settings / Security / Logging] -.-> C
+    Core -.-> S
+    Core -.-> D
+```
+
+Service chooses **why and when** an operation happens. Repository expresses **how** ORM persistence happens using the supplied Session. A Model describes a SQL entity; a Schema describes validated input/output. Layouts are reusable page shells, components are smaller UI pieces, and helpers contain small reusable logic.
+
+### 3. Create request sequence
+
+```mermaid
+sequenceDiagram
+    actor Employee
+    participant Form as AssetRequestForm / RequestView
+    participant API as frontend api.js
+    participant C as RequestController / AssetRequestCreate
+    participant S as RequestService
+    participant R as RequestRepository / AssetRequest Model
+    participant DB as PostgreSQL via Session
+    participant ZS as ZendeskService
+    participant Z as Zendesk Tickets API
+    Employee->>Form: Enter asset request
+    Form->>API: Validated form values
+    API->>C: POST /api/requests + Basic Auth
+    C->>C: FastAPI validates AssetRequestCreate
+    C->>S: Typed request and scoped Session
+    S->>R: Add AssetRequest
+    R->>DB: Stage insert; flush obtains local ID
+    S->>DB: Stage REQUEST_CREATED via AuditRepository
+    S->>DB: COMMIT primary request and audit
+    Note over S,Z: POSTGRESQL COMMIT OCCURS BEFORE ZENDESK CALL
+    S->>ZS: Create ticket for committed request
+    ZS->>Z: POST ticket with correlation ID
+    alt Zendesk succeeds
+        Z-->>ZS: Zendesk ticket ID and status
+        ZS-->>S: Ticket result
+        S->>DB: Store ticket ID, synced state and audit; COMMIT
+    else Expected Zendesk failure
+        ZS-->>S: Safe ZendeskError
+        S->>DB: KEEP request; mark sync_failed; audit failure; COMMIT
+    end
+    S-->>C: Persisted request
+    C-->>API: HTTP 201 response DTO
+    API-->>Form: Show local ID and integration state
+```
+
+If Zendesk is not configured, the request stays saved with `sync_pending`. A database flush obtains an ID but is not a commit. Integration failure handling does not implement automatic retries or manual reconciliation.
+
+### 4. Identifiers and audit relationship
+
+**These IDs are examples, not live test evidence.**
+
+```mermaid
+flowchart LR
+    A[AssetRequest: local id = 5] -->|stores external ticket ID| Z[Zendesk ticket ID = 54]
+    A --> H[external_id = royal-tires-asset-5]
+    H -->|supplied to Zendesk for correlation| Z
+    A -->|audit_logs.request_id = 5| E1[AuditLog event A: created]
+    A -->|audit_logs.request_id = 5| E2[AuditLog event B: ticket linked]
+    A -->|audit_logs.request_id = 5| E3[AuditLog event C: status changed]
+```
+
+The local database generates `AssetRequest.id`; Zendesk generates `zendesk_ticket_id`, which is stored locally in a nullable unique column. The deterministic external ID correlates systems: it is neither encryption nor hashing nor the database primary key. `audit_logs.request_id` is a foreign key to `asset_requests.id`, giving one request many chronological audit events. AuditLog is persisted PostgreSQL history, **not authentication/session state**. ZendeskConnection holds safe singleton metadata and external resource IDs; those external IDs are not local foreign keys.
+
+### 5. Zendesk status callback
+
+```mermaid
+flowchart TD
+    Agent[Zendesk agent changes status] --> Trigger[Zendesk Trigger]
+    Trigger --> WH[Webhook POST JSON / Bearer auth]
+    WH --> WC[WebhookController]
+    WC --> WS[Webhook Schema validation]
+    WS --> Service[WebhookService]
+    Service --> Correlate[Find by linked ticket ID; check external ID when supplied]
+    Correlate --> RR[RequestRepository]
+    RR --> AR[Update tracked AssetRequest]
+    AR --> Audit[AuditRepository adds AuditLog]
+    Audit --> DB[(PostgreSQL COMMIT)]
+    DB --> Read[GET local request API]
+    Read --> View[RequestDetailView polling / Dashboard refresh]
+```
+
+In an ordinary outbound API call, this application initiates the request. A webhook reverses that direction: Zendesk initiates an HTTP request after an event. Both use HTTP APIs. The callback uses a separate bearer secret; portal Basic Auth is not accepted as webhook authentication.
+
+RequestDetailView polls every 10 seconds and offers a local-data refresh. Dashboard loads on entry/manual refresh and searches the latest 100 loaded records. Neither browser View calls Zendesk. The service writes `ZENDESK_STATUS_CHANGED` to the audit table for changed status, or `ZENDESK_WEBHOOK_RECEIVED` for duplicate status; its application log line is `zendesk_status_sync`. Duplicate callbacks update the sync timestamp and add receipt history; event ordering is not implemented.
+
+### 6. Environment and security
+
+```mermaid
+flowchart TD
+    ENV[Render environment] --> Config[core/config.py]
+    Config --> Settings[Pydantic BaseSettings to typed Settings]
+    Settings --> URL[DATABASE_URL]
+    URL --> Data[Data: Engine / Session]
+    Data --> DB[(PostgreSQL)]
+    Settings --> Credentials[APP_USERNAME / APP_PASSWORD]
+    Credentials --> Basic[Basic Auth]
+    Basic --> Routes[Protected business routes]
+    Settings --> ZCreds[ZENDESK_SUBDOMAIN / ZENDESK_EMAIL / ZENDESK_API_TOKEN]
+    ZCreds --> ZS[ZendeskService]
+    ZS --> Z[Zendesk]
+    Settings --> Hook[ZENDESK_WEBHOOK_SECRET / RENDER_EXTERNAL_URL]
+    Hook --> Callback[Separate authenticated webhook]
+    Settings --> Mail[ZENDESK_NOTIFICATION_EMAIL]
+    Mail --> ZS
+    Settings --> Origin[FRONTEND_URL]
+    Origin --> CORS[CORS allowed origins]
+```
+
+Runtime injection means the hosting environment supplies values when the backend starts, rather than embedding them in GitHub. Pydantic Settings converts those values to typed configuration; `.env` supports local development. Frontend public configuration is compiled into the Vite build and must contain no secrets.
+
+- **Basic Auth:** required by this assignment; sent on protected requests over HTTPS. Base64 is encoding, not encryption. Browser credentials remain in memory; there is no server login session table.
+- **CORS:** explicit browser-origin policy, not authentication. Non-browser clients still need Basic Auth.
+- **Pydantic:** validates types, allowed values and lengths; Business Reason needs ten non-whitespace characters. Schemas are contracts, not SQL tables.
+- **SQLAlchemy:** ORM statements bind input as data rather than concatenate executable SQL. SQL injection means user input becomes SQL syntax.
+- **React/XSS:** user-controlled values render as normal text; no `dangerouslySetInnerHTML`. XSS would occur if malicious text became executable HTML/JavaScript.
+- **Response headers:** `X-Content-Type-Options: nosniff` limits MIME guessing; API `Cache-Control: no-store` discourages caching sensitive responses. These do not protect cookies or make REST stateless.
+- **Logging:** request middleware passes the request to the controller and logs method, matched route and response status on return. It does not currently measure duration. It omits headers/bodies/query strings; Zendesk error extraction separately redacts known secrets.
+- **Data lifecycle:** Base registers Models; Engine owns driver/pool configuration; session factory creates a request-scoped Session through `get_db`. Repositories receive that Session. Services commit transactions; request cleanup closes the Session. This package is an ApplicationDbContext mental bridge, not an Entity Framework class.
+
+### 7. CI pipeline
+
+```mermaid
+flowchart TD
+    Event[PR targeting main OR push to main] --> Actions[GitHub Actions CI]
+    Actions --> B[Backend job: ubuntu-latest]
+    B --> BC[checkout v4]
+    BC --> BP[setup-python v5: Python 3.13 / pip cache]
+    BP --> BI[pip install -r requirements.txt]
+    BI --> BT[python -m pytest]
+    Actions --> F[Frontend job: ubuntu-latest]
+    F --> FC[checkout v4]
+    FC --> FN[setup-node v4: Node 22.12.0 / npm cache]
+    FN --> FI[npm ci]
+    FI --> FT[npm test]
+    FT --> FB[npm run build]
+    FB --> PW[npx playwright install --with-deps chromium]
+    PW --> E2E[npm run test:e2e]
+```
+
+The jobs run independently in their backend/frontend directories. Workflow/ref concurrency cancels superseded runs. Backend tests use temporary SQLite and mock Zendesk; Playwright uses desktop/mobile Chromium with intercepted API responses. These are automated verification, not proof of live delivery or hosted PostgreSQL behavior.
+
+CI does not inherently deploy. Required branch-protection checks can make it a merge gate, but branch protection has not been asserted here. Render auto-deployment on main changes is separate; no redundant manual deployment is needed. Live evidence and any manual checks are recorded in [the verification report](docs/LIVE_VERIFICATION.md).
+
 ## Pull request progression
 
 PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 added email notifications, webhook status callbacks and tracking-page synchronization. PR8 expanded the MVC architecture map. PR9 improved safe Zendesk validation diagnostics. PR10 fixed cross-field Zendesk option-tag collisions. PR11 added opt-in isolation for confirmed legacy sandbox triggers. PR12 fixed meaningful Business Reason validation. PR13 added the request queue and sync explanation. PR14 promoted the queue into the searchable Dashboard and moved Zendesk setup under Settings. PR15 added restrained GSAP motion and an automotive visual layer. PR16 aligned the palette with Royal Tyres red/charcoal branding. PR17 physically aligns the codebase with the documented MVC folder targets while preserving behavior.

@@ -816,7 +816,7 @@ Good Helper examples:
 
 ```text
 normalize a Zendesk subdomain
-map Laptop → laptop field value
+map Laptop → rt_asset_laptop field value
 format a timestamp for display
 build a stable external ID string
 ```
@@ -1571,6 +1571,12 @@ Royal Tyres | Sync Status to Asset Portal
 
 The first two send notification emails. The third sends the status callback to FastAPI.
 
+## Opt-in legacy safeguards
+
+The governed plan can additionally include seven exact legacy titles: `Issue Category 1`, `Request Type 4`, `Query Type 6`, `Issue Type 6`, `Request Type 6`, `Query Type 5`, and `hello world`. The last live title has no question mark; its correction was explicitly approved after discovery.
+
+The only permitted update adds an ALL condition, Brand IS NOT the discovered Royal Tyres brand. Existing conditions, actions, title, active state and ordering are preserved and checked on read-back. Protected rules are reused; absent exact titles are skipped. Similar titles do not authorize broader changes.
+
 ---
 
 # 30. Dry-Run Plan
@@ -1756,106 +1762,16 @@ PR4  feat/request-ui                                ✓ merged
 PR5  feat/zendesk-integration                       ✓ merged
 PR6  fix/zendesk-field-types                        ✓ merged
 PR7  feat/zendesk-workflow-sync                     ✓ merged
-PR8  docs/mvc-architecture-map                      current docs-only architecture map
+PR8  docs/mvc-architecture-map                      merged documentation baseline
 ```
 
-PR8 is intentionally documentation-only. It does not change application behavior. A later refactor may physically extract Layouts, Middleware, Helpers, Repositories and Data/DbContext folders, but that should be a separate no-behavior-change PR protected by the existing tests.
+PR8 was documentation-only. PR9–PR17 subsequently added integration fixes, safeguards, validation, dashboard/presentation and the physical MVC structure. README records that progression; section 4 describes the current physical layout.
 
 ---
 
-# 37. Future Physical Refactor Target
+# 37. Physical Structure Status
 
-The code already follows most of this logic. If readability becomes more important than minimizing files, a future refactor may move toward:
-
-```text
-backend/app/
-│
-├── controllers/
-│   ├── request_controller.py
-│   ├── zendesk_controller.py
-│   └── webhook_controller.py
-│
-├── models/
-│   ├── asset_request.py
-│   ├── audit_log.py
-│   └── zendesk_connection.py
-│
-├── services/
-│   ├── request_service.py
-│   ├── zendesk_service.py
-│   └── webhook_service.py
-│
-├── repositories/
-│   ├── request_repository.py
-│   ├── audit_repository.py
-│   └── zendesk_repository.py
-│
-├── data/
-│   ├── base.py
-│   ├── db_context.py
-│   └── session.py
-│
-├── schemas/
-│   ├── request_schema.py
-│   ├── zendesk_schema.py
-│   └── webhook_schema.py
-│
-├── middleware/
-│   ├── request_logging.py
-│   └── security_headers.py
-│
-├── helpers/
-│   ├── datetime_helper.py
-│   ├── zendesk_helper.py
-│   └── validation_helper.py
-│
-├── core/
-│   ├── config.py
-│   ├── security.py
-│   └── logging_config.py
-│
-└── main.py
-```
-
-Frontend target:
-
-```text
-frontend/src/
-│
-├── views/
-│   ├── RequestView.jsx
-│   ├── RequestDetailView.jsx
-│   └── ZendeskSetupView.jsx
-│
-├── layouts/
-│   ├── AppLayout.jsx
-│   └── AuthLayout.jsx
-│
-├── components/
-│   ├── shared/
-│   │   ├── Brand.jsx
-│   │   ├── Sidebar.jsx
-│   │   ├── Topbar.jsx
-│   │   ├── Footer.jsx
-│   │   └── AppLink.jsx
-│   │
-│   └── requests/
-│       ├── AssetRequestForm.jsx
-│       ├── StatusBadge.jsx
-│       └── TrackRequestForm.jsx
-│
-├── services/
-│   └── api.js
-│
-├── helpers/
-│   ├── validation.js
-│   └── formatting.js
-│
-├── App.jsx
-└── main.jsx
-```
-
-Do not perform this refactor merely for folder aesthetics. Move code only when the resulting responsibility becomes clearer.
+The physical MVC structure is implemented. Section 4 is the current folder map; no further folder reorganization is required for the interview. Services own transaction sequencing, repositories receive scoped Sessions, and identity helpers are shared by outbound tickets and inbound callbacks.
 
 ---
 
@@ -1888,7 +1804,7 @@ Do not perform this refactor merely for folder aesthetics. Move code only when t
 
 A concise explanation:
 
-> I mapped the application around MVC even though the frontend and backend use different frameworks. React contains the Views and reusable Partial/Shared View equivalents. FastAPI routers are the Controllers. Controllers stay thin and call Services for business workflow. Services use a Repository/data layer against SQLAlchemy Models, and `database.py` acts as the DbContext equivalent by owning the engine and scoped sessions. Schemas are the DTO/ViewModel boundary. Middleware handles cross-cutting HTTP behavior. Zendesk is treated as an external integration Service. That gives me one consistent path to reason about the system: View → Controller → Service → Repository → Model → DbContext → Database.
+> I mapped the application around MVC even though the frontend and backend use different frameworks. React contains the Views and reusable Partial/Shared View equivalents. FastAPI routers are the Controllers. Controllers stay thin and call Services for business workflow. Services use a Repository/data layer against SQLAlchemy Models, and `data/` acts as the DbContext equivalent by owning the engine and scoped sessions. Schemas are the DTO/ViewModel boundary. Middleware handles cross-cutting HTTP behavior. Zendesk is treated as an external integration Service. That gives me one consistent path to reason about the system: View → Controller → Service → Repository → Model → DbContext → Database.
 
 For Zendesk specifically:
 
@@ -1905,7 +1821,7 @@ For Zendesk specifically:
 5. Services own business workflow and sequencing.
 6. Repositories own database access.
 7. Models represent persisted state.
-8. `database.py` is the current DbContext equivalent.
+8. `data/` is the current DbContext-equivalent infrastructure.
 9. Schemas are the API DTO/ViewModel boundary.
 10. Middleware owns cross-cutting HTTP behavior.
 11. Helpers must remain small and reusable; business use cases belong in Services.
@@ -1988,8 +1904,8 @@ Live verification still required:
 Later if time remains:
 
 - [ ] manual Zendesk reconciliation endpoint
-- [ ] operations dashboard
-- [ ] optional no-behavior-change physical architecture refactor
+- [x] operations dashboard
+- [x] physical MVC architecture structure
 - [ ] final presentation/demo hardening
 
 ---

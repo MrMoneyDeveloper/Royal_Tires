@@ -1,3 +1,17 @@
+/**
+ * ROLE: Page View: track one persisted request
+ * CALLED BY: App for /requests/:id
+ * CALLS: api.getRequest, formatting helper and SyncStatePanel
+ * DATA IN: Route ID and request DTO
+ * DATA OUT: Request details and latest locally stored status
+ * WHY: Present tracking while the backend owns synchronization.
+ * SECURITY / RELIABILITY: Polls only FastAPI every 10 seconds; cleanup cancels the timer.
+ *     Manual refresh is a local read, not Zendesk reconciliation. User text stays React
+ *     text.
+ * FLOW: App for /requests/:id -> this module -> api.getRequest, formatting helper and
+ *     SyncStatePanel
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';

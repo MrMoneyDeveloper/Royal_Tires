@@ -156,3 +156,19 @@ def test_duplicate_legacy_trigger_titles_stop_before_mutation(monkeypatch, setti
     with pytest.raises(zendesk_service.ZendeskError) as exc:
         legacy_trigger_guard.build_plan(settings)
     assert exc.value.status_code == 409
+
+
+def test_confirmed_hello_world_title_is_planned_without_matching_similar_rule(monkeypatch, settings):
+    confirmed = _trigger(28978973387036, "hello world")
+    similar = _trigger(999, "hello world?")
+    monkeypatch.setattr(
+        zendesk_service,
+        "_list_all",
+        lambda credentials, path, root_key: [confirmed, similar]
+        if root_key == "triggers" else [{"id": 42, "name": "Royal Tyres"}],
+    )
+    plan = legacy_trigger_guard.build_plan(settings)
+    matches = [item for item in plan if item["action"] == "update"]
+    assert len(matches) == 1
+    assert matches[0]["name"] == "hello world"
+    assert matches[0]["existing_id"] == confirmed["id"]

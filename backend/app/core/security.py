@@ -1,3 +1,17 @@
+"""
+ROLE: Core authentication: assignment-required HTTP Basic
+CALLED BY: Request and Zendesk router dependencies
+CALLS: Settings and constant-time credential comparisons
+DATA IN: Basic credentials from the HTTP request
+DATA OUT: Authenticated username or 401/503
+WHY: Share endpoint authentication without mixing it into business services.
+SECURITY / RELIABILITY: Base64 is encoding, not encryption; hosted HTTPS protects transport.
+    Empty server credentials fail closed. No server-side login session or AuditLog-based
+    authentication exists.
+FLOW: Request and Zendesk router dependencies -> this module -> Settings and constant-time
+    credential comparisons
+"""
+
 import secrets
 from typing import Annotated
 

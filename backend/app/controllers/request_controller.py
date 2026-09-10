@@ -1,3 +1,16 @@
+"""
+ROLE: Request Controller: HTTP boundary for create/list/detail
+CALLED BY: React api.js through /api/requests
+CALLS: RequestService; FastAPI schema/auth/session dependencies
+DATA IN: Basic-authenticated request, AssetRequestCreate or bounded pagination
+DATA OUT: AssetRequestResponse JSON; create returns HTTP 201
+WHY: Keep HTTP routing separate from business sequencing and SQL.
+SECURITY / RELIABILITY: FastAPI validates Pydantic input before the route function runs. All
+    three routes require Basic Auth; no direct SQL or Zendesk calls.
+FLOW: React api.js through /api/requests -> this module -> RequestService; FastAPI
+    schema/auth/session dependencies
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request

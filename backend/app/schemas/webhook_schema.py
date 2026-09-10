@@ -1,3 +1,16 @@
+"""
+ROLE: Webhook Schemas: event and acknowledgement contracts
+CALLED BY: FastAPI Webhook Controller
+CALLS: Pydantic literals and constraints
+DATA IN: Event, positive ticket ID, optional external ID and status
+DATA OUT: Typed event or validation error; acknowledgement fields
+WHY: Validate external event shape before business processing.
+SECURITY / RELIABILITY: Rejects extra fields and unsupported statuses. External ID is optional
+    in this contract; WebhookService checks it when supplied. Schema validation does not
+    replace bearer authentication.
+FLOW: FastAPI Webhook Controller -> this module -> Pydantic literals and constraints
+"""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field

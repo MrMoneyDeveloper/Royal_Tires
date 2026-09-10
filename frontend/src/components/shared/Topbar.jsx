@@ -1,3 +1,15 @@
+/**
+ * ROLE: Shared component: account/navigation header
+ * CALLED BY: AppLayout
+ * CALLS: AppLink and onSignOut callback
+ * DATA IN: Username, breadcrumb and navigation state
+ * DATA OUT: Header and sign-out action
+ * WHY: Separate header presentation from App session ownership.
+ * SECURITY / RELIABILITY: Displays username as text. App clears the in-memory API reference
+ *     on sign-out.
+ * FLOW: AppLayout -> this module -> AppLink and onSignOut callback
+ */
+
 import AppLink from '../AppLink.jsx';
 
 export default function Topbar({

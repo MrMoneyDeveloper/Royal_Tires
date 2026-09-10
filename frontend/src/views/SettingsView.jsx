@@ -1,3 +1,16 @@
+/**
+ * ROLE: Page View: account, diagnostics and setup composition
+ * CALLED BY: App for /settings and /zendesk-setup alias
+ * CALLS: ZendeskSetupView and backend diagnostic links
+ * DATA IN: Username, API client and docs URL
+ * DATA OUT: Account summary and embedded setup View
+ * WHY: Separate administration presentation from request submission.
+ * SECURITY / RELIABILITY: Displays account context, never passwords or Zendesk credentials.
+ *     Does not manage Zendesk user permissions.
+ * FLOW: App for /settings and /zendesk-setup alias -> this module -> ZendeskSetupView and
+ *     backend diagnostic links
+ */
+
 import ZendeskSetupView from './ZendeskSetupView.jsx';
 import './settings.css';
 

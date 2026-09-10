@@ -1,3 +1,17 @@
+"""
+ROLE: HTTP middleware: safe response-path request logging
+CALLED BY: main registers it; FastAPI invokes it around requests
+CALLS: call_next then app.http logger
+DATA IN: HTTP method, matched route template and returned status
+DATA OUT: Unchanged response plus safe log entry
+WHY: Observe endpoint outcomes without copying request bodies or credentials.
+SECURITY / RELIABILITY: Request enters, continues toward Controller, and returning response is
+    logged. Current implementation records method/route/status only, not elapsed timing, query
+    strings or Authorization headers.
+FLOW: main registers it; FastAPI invokes it around requests -> this module -> call_next then
+    app.http logger
+"""
+
 import logging
 
 from fastapi import FastAPI, Request

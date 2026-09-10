@@ -1,3 +1,16 @@
+/**
+ * ROLE: Reusable component / Partial View: request form
+ * CALLED BY: RequestView
+ * CALLS: validation helper and onSubmit callback
+ * DATA IN: User text, submission/error props
+ * DATA OUT: Trimmed values or inline errors
+ * WHY: Reuse form validation and accessibility without owning HTTP.
+ * SECURITY / RELIABILITY: Client checks are usability only; backend independently validates.
+ *     Whitespace does not count toward the minimum reason. Submitting state prevents
+ *     repeated clicks.
+ * FLOW: RequestView -> this module -> validation helper and onSubmit callback
+ */
+
 import { useRef, useState } from 'react';
 import {
   ASSET_TYPES,

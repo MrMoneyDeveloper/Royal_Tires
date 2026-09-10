@@ -1,3 +1,15 @@
+/**
+ * ROLE: Reusable component: integration status presentation
+ * CALLED BY: RequestDetailView
+ * CALLS: StatusBadge, formatting helper and onRefresh
+ * DATA IN: Persisted request DTO and refresh state
+ * DATA OUT: Ticket/state/timestamp display
+ * WHY: Share sync explanation without performing integration workflow.
+ * SECURITY / RELIABILITY: Refresh delegates to the parent local-API read. Pending/failed
+ *     display is not a retry or reconciliation implementation.
+ * FLOW: RequestDetailView -> this module -> StatusBadge, formatting helper and onRefresh
+ */
+
 import StatusBadge from './StatusBadge.jsx';
 import { formatDateTime } from '../helpers/formatting.js';
 import './sync-state.css';

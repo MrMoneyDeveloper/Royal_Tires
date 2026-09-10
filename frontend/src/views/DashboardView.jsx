@@ -1,3 +1,17 @@
+/**
+ * ROLE: Page View: searchable request dashboard
+ * CALLED BY: App for /dashboard and /requests alias
+ * CALLS: api.listRequests, AppLink, StatusBadge and formatting helper
+ * DATA IN: Up to 100 latest request DTOs; local search/filter state
+ * DATA OUT: Summary counts and filtered table
+ * WHY: Keep page display/search separate from backend persistence.
+ * SECURITY / RELIABILITY: Counts/search cover the loaded 100 records, not necessarily the
+ *     entire database. Loads on entry and manual refresh; no automatic dashboard polling.
+ *     User data is rendered as text.
+ * FLOW: App for /dashboard and /requests alias -> this module -> api.listRequests, AppLink,
+ *     StatusBadge and formatting helper
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';

@@ -1,3 +1,17 @@
+"""
+ROLE: Zendesk integration Service: discovery, provisioning and ticket creation
+CALLED BY: Zendesk Controller, RequestService and legacy trigger guard
+CALLS: Zendesk REST API via httpx; ZendeskRepository and request identity helpers
+DATA IN: Server Settings, verified metadata, approved setup invocation or committed request
+DATA OUT: Safe plans/errors, read-back results, connection metadata or ticket response
+WHY: Keep external HTTP payloads and dependency order out of request routes.
+SECURITY / RELIABILITY: Secrets stay server-side; errors redact known secrets. Core resources
+    reuse matching names and verify returned IDs. Connection metadata goes through
+    ZendeskRepository using the injected Session; the service retains transaction ownership.
+FLOW: Zendesk Controller, RequestService and legacy trigger guard -> this module -> Zendesk
+    REST API via httpx; ZendeskRepository and request identity helpers
+"""
+
 import json
 import logging
 import re
@@ -12,6 +26,12 @@ from app.core.config import Settings
 from app.data.base import utc_now
 from app.models.asset_request import AssetRequest
 from app.models.zendesk_connection import ZendeskConnection
+from app.repositories import zendesk_repository
+from app.helpers.request_identity import (
+    asset_type_to_zendesk_value,
+    build_external_id,
+    build_local_request_tag,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -376,7 +396,7 @@ def build_setup_plan(credentials: ZendeskCredentials, settings: Settings) -> lis
 
 
 def get_connection(db: Session) -> ZendeskConnection | None:
-    return db.get(ZendeskConnection, 1)
+    return zendesk_repository.get_connection(db)
 
 
 def _ids(connection: ZendeskConnection) -> dict[str, int | None]:
@@ -521,7 +541,7 @@ def connect(db: Session, settings: Settings) -> dict:
     )
     if connection is None:
         connection = ZendeskConnection(id=1, subdomain=credentials.subdomain, api_email=credentials.email)
-        db.add(connection)
+        zendesk_repository.add_connection(db, connection)
     else:
         connection.subdomain = credentials.subdomain
         connection.api_email = credentials.email
@@ -896,10 +916,6 @@ def apply_setup(db: Session, settings: Settings) -> dict:
     )
 
 
-def _asset_value(asset_type: str) -> str:
-    return "rt_asset_" + asset_type.strip().lower().replace(" ", "_")
-
-
 def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict:
     """Create one Zendesk ticket using Render-held credentials and verified IDs."""
     connection = get_connection(db)
@@ -926,16 +942,16 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
                 "public": False,
             },
             "requester": {"name": record.requester_name, "email": record.requester_email},
-            "external_id": f"royal-tires-asset-{record.id}",
+            "external_id": build_external_id(record.id),
             "brand_id": connection.brand_id,
             "group_id": connection.group_id,
             "ticket_form_id": connection.ticket_form_id,
             "custom_fields": [
-                {"id": connection.asset_type_field_id, "value": _asset_value(record.asset_type)},
+                {"id": connection.asset_type_field_id, "value": asset_type_to_zendesk_value(record.asset_type)},
                 {"id": connection.local_request_id_field_id, "value": str(record.id)},
                 {"id": connection.request_source_field_id, "value": PORTAL_TAG},
             ],
-            "tags": ["it_asset_request", PORTAL_TAG, f"local_request_{record.id}"],
+            "tags": ["it_asset_request", PORTAL_TAG, build_local_request_tag(record.id)],
             "priority": "normal",
         }
     }
