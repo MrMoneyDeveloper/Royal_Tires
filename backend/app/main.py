@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import sessionmaker
 
 from app.controllers.request_controller import router as request_router
+from app.controllers.webhook_controller import router as webhook_router
 from app.controllers.zendesk_controller import router as zendesk_router
 from app.core.config import Settings
 from app.core.logging_config import configure_logging
@@ -26,7 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         engine.dispose()
 
-    app = FastAPI(title="Royal Tyres IT Asset Requests", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Royal Tyres IT Asset Requests", version="0.3.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(request_router)
     app.include_router(zendesk_router)
+    app.include_router(webhook_router)
 
     @app.middleware("http")
     async def log_request(request: Request, call_next):
