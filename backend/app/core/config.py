@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     zendesk_notification_email: str = "farhaanhotd1@gmail.com"
     render_external_url: str = ""
 
+    # Opt-in because this safeguard updates pre-existing sandbox triggers rather
+    # than only objects owned by this project.
+    zendesk_legacy_trigger_guard_enabled: bool = False
+
     @field_validator("frontend_url")
     @classmethod
     def validate_origins(cls, value: str) -> str:
