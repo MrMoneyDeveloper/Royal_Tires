@@ -28,16 +28,16 @@ def create_request(db: Session, data: AssetRequestCreate, settings: Settings) ->
     db.flush()
     add_audit(db, record.id, "REQUEST_CREATED", "api", "Asset request saved.")
 
-    # Primary persistence is committed before the secondary Zendesk integration.
-    # A helpdesk outage must never lose the employee's asset request.
+    # PostgreSQL/SQLite is the primary system of record. Commit before calling
+    # Zendesk so a helpdesk outage can never discard the employee request.
     db.commit()
     db.refresh(record)
 
-    if not zendesk_service.is_configured(settings):
+    if not zendesk_service.is_configured(db):
         return record
 
     try:
-        ticket = zendesk_service.create_ticket(settings, record)
+        ticket = zendesk_service.create_ticket(settings, db, record)
         record.zendesk_ticket_id = ticket["id"]
         record.zendesk_status = ticket.get("status") or "new"
         record.zendesk_sync_status = "synced"
@@ -47,7 +47,7 @@ def create_request(db: Session, data: AssetRequestCreate, settings: Settings) ->
             record.id,
             "ZENDESK_TICKET_CREATED",
             "zendesk",
-            f"Zendesk ticket {record.zendesk_ticket_id} created.",
+            f"Zendesk ticket {record.zendesk_ticket_id} created from verified portal configuration.",
         )
     except zendesk_service.ZendeskError:
         logger.exception("Zendesk ticket creation failed request_id=%s", record.id)
