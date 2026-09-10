@@ -2,7 +2,7 @@
 
 **Candidate:** Mohammed Farhaan Buckas  
 **Purpose:** Royal Tyres technical interview practical  
-**Hosting:** React/Vite on Vercel, FastAPI on Render, Render PostgreSQL, Zendesk sandbox  
+**Hosting:** React/Vite on Render Static Sites, FastAPI on Render, Render PostgreSQL, Zendesk sandbox
 **Design goal:** A small full-stack application that is easy to explain while demonstrating persistence, security, controlled Zendesk provisioning, notifications, auditability, recoverable integration failure, and a clear MVC-style solution map.
 
 ---
@@ -32,7 +32,7 @@ The hosted solution must:
 17. use feature branches, pull requests and GitHub Actions CI;
 18. keep the solution organized around an MVC mental model so every file has an obvious responsibility.
 
-Manual pull/reconciliation and the operations dashboard remain later enhancements. Do not add microservices, queues or infrastructure the practical does not need.
+Manual pull/reconciliation remains a later enhancement. The searchable operations dashboard is part of the hosted solution. Do not add microservices, queues or infrastructure the practical does not need.
 
 ---
 
@@ -327,6 +327,35 @@ Responsibilities:
 - display success/failure state;
 - navigate to request tracking.
 
+## `DashboardView.jsx`
+
+Conceptual MVC View:
+
+```text
+IT Service Desk Dashboard View
+```
+
+Responsibilities:
+
+- list and search local requests;
+- filter active, solved and sync-failed records;
+- show linked Zendesk ticket/status information;
+- navigate to one request for detailed tracking.
+
+## `SettingsView.jsx`
+
+Conceptual MVC View:
+
+```text
+Application Settings View
+```
+
+Responsibilities:
+
+- show account/session context;
+- expose API diagnostics/Swagger navigation;
+- host the governed Zendesk configuration View.
+
 ## `RequestDetailView.jsx`
 
 Conceptual MVC View:
@@ -407,23 +436,9 @@ Shared Partial: Application Navigation Link
 
 It centralizes internal SPA navigation behavior.
 
-## Shared View / Layout equivalents currently inside `App.jsx`
+## Shared View / Layout structure
 
-The application shell currently contains shared concerns such as:
-
-```text
-Brand
-Sidebar
-Topbar
-Navigation
-Account area
-Track-request form
-Workspace footer
-```
-
-These work today but are logically **Shared Views / Layouts**.
-
-Future refactor target:
+The application shell is physically separated into real shared Views and Partial Views:
 
 ```text
 frontend/src/layouts/
@@ -435,10 +450,9 @@ frontend/src/components/shared/
     Sidebar.jsx
     Topbar.jsx
     Footer.jsx
-    TrackRequestForm.jsx
 ```
 
-The goal is not to create empty folders. Shared files should only be extracted when they contain a real reusable responsibility.
+`App.jsx` owns routing and session composition. The layout files own the authenticated and unauthenticated shells, while shared components own reusable brand/navigation/footer presentation.
 
 ---
 
@@ -627,7 +641,7 @@ add AuditLog
 persist safe Zendesk configuration metadata
 ```
 
-Future organization, if the single file becomes too large:
+Current repository organization:
 
 ```text
 backend/app/repositories/
@@ -675,14 +689,7 @@ ASP.NET ApplicationDbContext
 SQLAlchemy engine + Base + Session factory + get_db()
 ```
 
-Future folder target, only if a refactor improves readability:
-
-```text
-backend/app/data/
-    base.py
-    db_context.py
-    session.py
-```
+The physical data package separates declarative/timestamp concerns, engine configuration and scoped session dependencies without introducing an artificial EF-style class.
 
 The name `DbContext` may be used in documentation as a teaching/mental-model alias, but the implementation remains standard SQLAlchemy.
 
@@ -724,7 +731,7 @@ Schemas should own validation such as:
 - unexpected input rejection;
 - API response shape.
 
-Future organization if the file grows:
+Current schema organization:
 
 ```text
 backend/app/schemas/
@@ -774,7 +781,7 @@ Middleware
 HTTP Response
 ```
 
-Future organization:
+Current middleware organization:
 
 ```text
 backend/app/middleware/
@@ -1119,7 +1126,11 @@ The critical reliability decision is that PostgreSQL is committed before Zendesk
 ## Flow B — Track an existing request
 
 ```text
-Employee enters local request ID
+Employee searches or filters the Dashboard
+  ↓
+DashboardView.jsx                       VIEW
+  ↓
+Employee opens a request
   ↓
 RequestDetailView.jsx                   VIEW
   ↓
@@ -1179,7 +1190,7 @@ create/reuse + verify Zendesk resources
   ↓
 ZendeskConnection Model
   ↓
-database.py / PostgreSQL                DB CONTEXT / DATABASE
+data/db_context.py + PostgreSQL      DB CONTEXT / DATABASE
 ```
 
 ## Flow D — Zendesk status change updates Track a Request
@@ -1217,11 +1228,12 @@ updated status appears in VIEW
 ```text
 ┌────────────────────────────────────┐
 │ VIEW LAYER                         │
-│ React + Vite on Render Static Sites             │
+│ React + Vite on Render Static Sites │
 │                                    │
 │ RequestView                        │
+│ DashboardView                      │
 │ RequestDetailView                  │
-│ ZendeskSetupView                   │
+│ SettingsView / ZendeskSetupView    │
 │ Shared / Partial components        │
 └──────────────────┬─────────────────┘
                    │ HTTPS / JSON / Basic Auth
@@ -1405,15 +1417,19 @@ Other
 
 After submission, display the local request ID, local status, Zendesk ticket ID when present and Zendesk sync state.
 
+## `/dashboard`
+
+Search and filter requests by request ID, requester, email, asset, Zendesk ticket and sync state. Open any row to inspect the full request.
+
 ## `/requests/:id`
 
-Display request details, local status, Zendesk status, sync state and timestamps.
+Display request details, local status, Zendesk status, sync state and timestamps. The page includes **Refresh status** and silently reads the local API every 10 seconds while open.
 
-The page includes **Refresh status** and silently reads the local API every 10 seconds while open.
+## `/settings`
 
-## `/zendesk-setup`
+Authenticated settings View for account/session information, developer diagnostics and the governed Zendesk configuration workflow. `ZendeskSetupView.jsx` is rendered inside Settings.
 
-Authenticated administration View that tests server-side Zendesk credentials, discovers live resources, displays the governed plan, captures approval, applies configuration and shows verification results.
+`/requests` remains a Dashboard alias and `/zendesk-setup` remains a Settings alias so older demo links do not break.
 
 ---
 
@@ -1696,7 +1712,6 @@ POST /api/zendesk/apply
 POST /api/webhooks/zendesk
 
 POST /api/requests/{id}/sync        # later manual reconciliation
-GET  /api/dashboard/summary         # later dashboard
 ```
 
 Swagger/OpenAPI remains available at `/docs`.
