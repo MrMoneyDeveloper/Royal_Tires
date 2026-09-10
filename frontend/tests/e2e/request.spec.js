@@ -107,7 +107,9 @@ test('login, validation, dashboard search, safe tracking, settings, and logout',
   await expect(page.getByRole('link', { name: '#27' })).toBeVisible();
   await expect(page.getByText('#54')).toBeVisible();
   await expect(page.getByText('Zendesk linked')).toBeVisible();
-  await expect(page.getByText('Sync errors')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Dashboard summary' }).getByText('Sync errors'),
+  ).toBeVisible();
 
   await page.getByLabel('Search requests').fill('54');
   await expect(page.getByRole('link', { name: '#27' })).toBeVisible();
