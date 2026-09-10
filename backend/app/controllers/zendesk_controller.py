@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import require_user
 from app.database import get_db
-from app.schemas import ZendeskApplyRequest, ZendeskConnectRequest, ZendeskSetupStatus
+from app.schemas import ZendeskApplyRequest, ZendeskSetupStatus
 from app.services import zendesk_service
 
 router = APIRouter(
@@ -45,15 +45,10 @@ def get_setup(db: Database, request: Request):
 
 
 @router.post("/connect", response_model=ZendeskSetupStatus)
-def connect(data: ZendeskConnectRequest, db: Database, request: Request):
+def connect(db: Database, request: Request):
+    """Test Zendesk credentials already configured in the backend environment."""
     try:
-        status = zendesk_service.connect(
-            db,
-            request.app.state.settings,
-            data.subdomain,
-            str(data.email),
-            data.api_token.get_secret_value(),
-        )
+        status = zendesk_service.connect(db, request.app.state.settings)
         return _with_plan_fingerprint(status)
     except zendesk_service.ZendeskError as error:
         raise _translate(error) from error
