@@ -142,7 +142,7 @@ test('tests env credentials, previews and explicitly applies complete Zendesk wo
   await expect(page.getByText('Royal Tyres | Demo Notifications')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Asset Status Sync')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Sync Status to Asset Portal')).toBeVisible();
-  await expect(page.getByText('farhaanhotd1@gmail.com')).toBeVisible();
+  await expect(page.getByText('Receiver: farhaanhotd1@gmail.com', { exact: true })).toBeVisible();
   await expect(page.getByText('CREATE').first()).toBeVisible();
   await expect(page.getByText(/Reviewed plan ref:/)).toBeVisible();
 
