@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 AssetType = Literal["Laptop", "Monitor", "Mouse", "Keyboard", "Headset", "Docking Station", "Other"]
 
@@ -32,14 +32,6 @@ class AssetRequestResponse(BaseModel):
     updated_at: datetime
 
 
-class ZendeskConnectRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-
-    subdomain: str = Field(min_length=1, max_length=150)
-    email: EmailStr = Field(max_length=254)
-    api_token: SecretStr = Field(min_length=1)
-
-
 class ZendeskApplyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -62,6 +54,7 @@ class ZendeskUserSummary(BaseModel):
 
 
 class ZendeskSetupStatus(BaseModel):
+    environment_configured: bool = False
     connected: bool
     configured: bool
     can_configure: bool
