@@ -96,6 +96,26 @@ test('login, validation, safe request tracking, and session logout', async ({
   ).toBeVisible();
 });
 
+test('business reason cannot satisfy the minimum with whitespace', async ({
+  page,
+}) => {
+  await page.goto('/request');
+  await signIn(page);
+  await page.getByLabel('Requester name').fill('Test User');
+  await page.getByLabel('Requester email').fill('test@example.com');
+  await page.getByLabel('Asset type').selectOption('Laptop');
+  await page.getByLabel('Business reason').fill('a\n\n\n\n\n\t    b\n\n\n\n\n');
+
+  await expect(page.getByText(/2 meaningful/)).toBeVisible();
+  await page.getByRole('button', { name: 'Submit IT Asset Request' }).click();
+
+  await expect(
+    page.getByText(/at least 10 non-whitespace characters/),
+  ).toBeVisible();
+  await expect(page.getByText('Request successfully saved.')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/request$/);
+});
+
 test('missing tracking record offers recovery', async ({ page }) => {
   await page.goto('/requests/999');
   await signIn(page);
