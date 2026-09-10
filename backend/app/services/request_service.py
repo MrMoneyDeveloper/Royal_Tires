@@ -2,12 +2,11 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from app import repository
 from app.core.config import Settings
-from app.database import utc_now
+from app.data.base import utc_now
 from app.models.asset_request import AssetRequest
-from app.models.audit_log import AuditLog
-from app.schemas import AssetRequestCreate
+from app.repositories import audit_repository, request_repository
+from app.schemas.request_schema import AssetRequestCreate
 from app.services import zendesk_service
 
 logger = logging.getLogger(__name__)
@@ -17,14 +16,22 @@ class RequestNotFound(Exception):
     pass
 
 
-def add_audit(db: Session, request_id: int, event_type: str, source: str, message: str) -> None:
-    db.add(AuditLog(request_id=request_id, event_type=event_type, source=source, message=message))
+def add_audit(
+    db: Session,
+    request_id: int,
+    event_type: str,
+    source: str,
+    message: str,
+) -> None:
+    audit_repository.add_audit(db, request_id, event_type, source, message)
     logger.info("event=%s request_id=%s source=%s", event_type, request_id, source)
 
 
-def create_request(db: Session, data: AssetRequestCreate, settings: Settings) -> AssetRequest:
+def create_request(
+    db: Session, data: AssetRequestCreate, settings: Settings
+) -> AssetRequest:
     record = AssetRequest(**data.model_dump())
-    db.add(record)
+    request_repository.add_request(db, record)
     db.flush()
     add_audit(db, record.id, "REQUEST_CREATED", "api", "Asset request saved.")
 
@@ -66,11 +73,11 @@ def create_request(db: Session, data: AssetRequestCreate, settings: Settings) ->
 
 
 def get_request(db: Session, request_id: int) -> AssetRequest:
-    record = repository.get_request(db, request_id)
+    record = request_repository.get_request(db, request_id)
     if record is None:
         raise RequestNotFound()
     return record
 
 
 def list_requests(db: Session, limit: int, offset: int) -> list[AssetRequest]:
-    return repository.list_requests(db, limit, offset)
+    return request_repository.list_requests(db, limit, offset)

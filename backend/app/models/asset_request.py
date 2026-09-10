@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base, UTCDateTime, utc_now
+from app.data.base import Base, UTCDateTime, utc_now
 
 
 class AssetRequest(Base):

@@ -2,15 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import SyncStatePanel from '../components/SyncStatePanel.jsx';
-
-export function formatDate(value) {
-  return value
-    ? new Date(value).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : 'Not yet synced';
-}
+import { formatDateTime } from '../helpers/formatting.js';
 
 export default function RequestDetailView({ id, api, navigate }) {
   const [record, setRecord] = useState(null);
@@ -64,9 +56,12 @@ export default function RequestDetailView({ id, api, navigate }) {
     // authenticated server-side webhook and is persisted before this view reads it.
     const timer = window.setInterval(() => {
       if (active) {
-        api.getRequest(id).then((value) => {
-          if (active) setRecord(value);
-        }).catch(() => {});
+        api
+          .getRequest(id)
+          .then((value) => {
+            if (active) setRecord(value);
+          })
+          .catch(() => {});
       }
     }, 10000);
 
@@ -122,11 +117,11 @@ export default function RequestDetailView({ id, api, navigate }) {
                 </div>
                 <div>
                   <dt>Created</dt>
-                  <dd>{formatDate(record.created_at)}</dd>
+                  <dd>{formatDateTime(record.created_at, 'Not available')}</dd>
                 </div>
                 <div>
                   <dt>Last updated</dt>
-                  <dd>{formatDate(record.updated_at)}</dd>
+                  <dd>{formatDateTime(record.updated_at, 'Not available')}</dd>
                 </div>
               </dl>
               <div className="reason-block">

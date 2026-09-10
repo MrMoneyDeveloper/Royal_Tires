@@ -3,7 +3,7 @@ import {
   ASSET_TYPES,
   meaningfulCharacterCount,
   validateRequest,
-} from '../services/validation.js';
+} from '../helpers/validation.js';
 
 const initialValues = {
   requester_name: '',

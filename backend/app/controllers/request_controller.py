@@ -4,11 +4,15 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.security import require_user
-from app.database import get_db
-from app.schemas import AssetRequestCreate, AssetRequestResponse
+from app.data.session import get_db
+from app.schemas.request_schema import AssetRequestCreate, AssetRequestResponse
 from app.services import request_service
 
-router = APIRouter(prefix="/api/requests", tags=["Requests"], dependencies=[Depends(require_user)])
+router = APIRouter(
+    prefix="/api/requests",
+    tags=["Requests"],
+    dependencies=[Depends(require_user)],
+)
 Database = Annotated[Session, Depends(get_db)]
 
 
@@ -18,8 +22,11 @@ def create_request(data: AssetRequestCreate, db: Database, request: Request):
 
 
 @router.get("", response_model=list[AssetRequestResponse])
-def list_requests(db: Database, limit: Annotated[int, Query(ge=1, le=100)] = 50,
-                  offset: Annotated[int, Query(ge=0)] = 0):
+def list_requests(
+    db: Database,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
     return request_service.list_requests(db, limit, offset)
 
 

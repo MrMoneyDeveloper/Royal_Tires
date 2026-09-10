@@ -2,9 +2,100 @@
 
 An internal IT asset request portal for Mohammed Farhaan Buckas's Royal Tyres technical interview. The authoritative architecture and implementation notes are in [PROJECT_SPEC.md](PROJECT_SPEC.md).
 
-React/Vite views call thin FastAPI controllers, which delegate to services, repositories and SQLAlchemy models. Local development uses SQLite. The hosted application uses Vercel for the frontend, Render for FastAPI, Render PostgreSQL for persistence, and a Zendesk sandbox as the helpdesk integration.
+React/Vite views call thin FastAPI controllers, which delegate to services, repositories and SQLAlchemy models. Local development uses SQLite. The hosted interview application uses Render Static Sites for the frontend, Render for FastAPI, Render PostgreSQL for persistence, and a Zendesk sandbox as the helpdesk integration.
 
 The local SQL request is committed before any Zendesk call. A Zendesk outage therefore cannot discard an employee request.
+
+## Physical MVC structure
+
+The repository now physically mirrors the MVC mental model documented in `PROJECT_SPEC.md` instead of keeping several unrelated responsibilities in root modules.
+
+```text
+frontend/src/
+├── views/                 # page-level Views
+│   ├── RequestView.jsx
+│   ├── DashboardView.jsx
+│   ├── RequestDetailView.jsx
+│   ├── SettingsView.jsx
+│   └── ZendeskSetupView.jsx
+├── layouts/               # shared page shells
+│   ├── AppLayout.jsx
+│   └── AuthLayout.jsx
+├── components/            # Partial / reusable Views
+│   ├── shared/
+│   │   ├── Brand.jsx
+│   │   ├── Sidebar.jsx
+│   │   ├── Topbar.jsx
+│   │   └── Footer.jsx
+│   ├── AssetRequestForm.jsx
+│   ├── StatusBadge.jsx
+│   └── SyncStatePanel.jsx
+├── services/
+│   └── api.js             # browser HTTP service
+├── helpers/
+│   ├── formatting.js
+│   └── validation.js
+├── App.jsx                # client routing + composition
+└── main.jsx               # React entry point
+
+backend/app/
+├── controllers/           # FastAPI HTTP endpoints
+│   ├── request_controller.py
+│   ├── zendesk_controller.py
+│   └── webhook_controller.py
+├── services/              # business/use-case orchestration
+│   ├── request_service.py
+│   ├── zendesk_service.py
+│   ├── webhook_service.py
+│   └── legacy_trigger_guard.py
+├── repositories/          # persistence access only
+│   ├── request_repository.py
+│   ├── audit_repository.py
+│   └── zendesk_repository.py
+├── models/                # SQLAlchemy entities
+│   ├── asset_request.py
+│   ├── audit_log.py
+│   └── zendesk_connection.py
+├── schemas/               # Pydantic DTOs / ViewModels
+│   ├── request_schema.py
+│   ├── zendesk_schema.py
+│   └── webhook_schema.py
+├── data/                  # DbContext-equivalent infrastructure
+│   ├── base.py
+│   ├── db_context.py
+│   └── session.py
+├── middleware/
+│   ├── request_logging.py
+│   └── security_headers.py
+├── helpers/
+│   └── request_identity.py
+├── core/                  # config, auth, logging policy
+└── main.py                # application composition root
+```
+
+SQLAlchemy infrastructure lives exclusively in `backend/app/data/`. Controllers and services import the data/session modules directly; there is no root database compatibility facade.
+
+The interview explanation is therefore direct:
+
+```text
+USER
+  ↓
+VIEW / PARTIAL VIEW
+  ↓
+CONTROLLER
+  ↓
+SERVICE
+  ↓
+REPOSITORY
+  ↓
+MODEL
+  ↓
+DB CONTEXT / SESSION
+  ↓
+POSTGRESQL
+```
+
+Zendesk branches from the Service layer as an external integration, while middleware wraps the HTTP pipeline and schemas validate API boundaries.
 
 ## User-facing structure
 
@@ -81,7 +172,7 @@ Zendesk credentials and webhook secrets never enter the React application.
 
 ## Governed Zendesk setup
 
-Zendesk configuration now lives under **Settings**. Its flow is:
+Zendesk configuration lives under **Settings**. Its flow is:
 
 ```text
 Test backend ENV credentials
@@ -115,4 +206,4 @@ The request detail page refreshes its local API data every 10 seconds while open
 
 ## Pull request progression
 
-PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 added email notifications, webhook status callbacks and tracking-page synchronization. PR8 expanded the MVC architecture map. PR9 improved safe Zendesk validation diagnostics. PR10 fixed cross-field Zendesk option-tag collisions. PR11 added opt-in isolation for confirmed legacy sandbox triggers. PR12 fixed meaningful Business Reason validation. PR13 added the request queue, sync explanation and Zendesk change-boundary clarity. The next UI increment promotes that queue into the searchable Dashboard and moves Zendesk setup under user Settings.
+PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 added email notifications, webhook status callbacks and tracking-page synchronization. PR8 expanded the MVC architecture map. PR9 improved safe Zendesk validation diagnostics. PR10 fixed cross-field Zendesk option-tag collisions. PR11 added opt-in isolation for confirmed legacy sandbox triggers. PR12 fixed meaningful Business Reason validation. PR13 added the request queue and sync explanation. PR14 promoted the queue into the searchable Dashboard and moved Zendesk setup under Settings. PR15 added restrained GSAP motion and an automotive visual layer. PR16 aligned the palette with Royal Tyres red/charcoal branding. PR17 physically aligns the codebase with the documented MVC folder targets while preserving behavior.

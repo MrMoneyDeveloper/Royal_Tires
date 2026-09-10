@@ -5,14 +5,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import sessionmaker
 
 from app.controllers.request_controller import router as request_router
 from app.controllers.webhook_controller import router as webhook_router
 from app.controllers.zendesk_controller import router as zendesk_router
 from app.core.config import Settings
 from app.core.logging_config import configure_logging
-from app.database import Base, create_db_engine
+from app.data import Base, create_db_engine, create_session_factory
+from app.middleware import register_request_logging, register_security_headers
 from app.services.request_service import RequestNotFound
 
 
@@ -27,34 +27,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         engine.dispose()
 
-    app = FastAPI(title="Royal Tyres IT Asset Requests", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Royal Tyres IT Asset Requests",
+        version="0.3.0",
+        lifespan=lifespan,
+    )
     app.state.settings = settings
     app.state.engine = engine
-    app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+    app.state.session_factory = create_session_factory(engine)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    register_request_logging(app)
+    register_security_headers(app)
+
     app.include_router(request_router)
     app.include_router(zendesk_router)
     app.include_router(webhook_router)
-
-    @app.middleware("http")
-    async def log_request(request: Request, call_next):
-        response = await call_next(request)
-        route = request.scope.get("route")
-        logging.getLogger("app.http").info(
-            "method=%s route=%s status=%s",
-            request.method,
-            getattr(route, "path", "unmatched"),
-            response.status_code,
-        )
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        if request.url.path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
-        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):

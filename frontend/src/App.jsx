@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createApi } from './services/api.js';
 import AppLink from './components/AppLink.jsx';
-import RequestView from './views/RequestView.jsx';
-import RequestsView from './views/RequestsView.jsx';
+import AppLayout from './layouts/AppLayout.jsx';
+import AuthLayout from './layouts/AuthLayout.jsx';
+import { createApi } from './services/api.js';
+import DashboardView from './views/DashboardView.jsx';
 import RequestDetailView from './views/RequestDetailView.jsx';
+import RequestView from './views/RequestView.jsx';
 import SettingsView from './views/SettingsView.jsx';
-
-function Brand() {
-  return (
-    <div className="brand">
-      <span className="brand-mark">R</span>
-      <div>
-        ROYAL TYRES<small>IT SERVICE DESK</small>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -96,6 +87,12 @@ export default function App() {
     window.scrollTo({ top: 0 });
   }
 
+  function signOut() {
+    setApi(null);
+    setUsername('');
+    setError('');
+  }
+
   async function signIn(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -108,9 +105,7 @@ export default function App() {
         {
           onUnauthorized: () => {
             setApi(null);
-            setError(
-              'Your credentials are no longer valid. Please sign in again.',
-            );
+            setError('Your credentials are no longer valid. Please sign in again.');
           },
         },
       );
@@ -129,71 +124,51 @@ export default function App() {
     }
   }
 
-  if (!api)
+  if (!api) {
     return (
-      <main className="login-layout">
-        <section className="login-story">
-          <Brand />
-          <div>
-            <p className="heritage-line">Trusted tyre workshop since 1939</p>
-            <p className="eyebrow">INTERNAL IT · SUPPORTING THE WAY YOU WORK</p>
-            <h1>
-              Keep your work
-              <br />
-              <em>moving.</em>
-            </h1>
-            <p className="login-subcopy">
-              Request the equipment you need, then follow it from the service desk
-              through to Zendesk without losing sight of the request.
-            </p>
+      <AuthLayout>
+        <form className="login-form" onSubmit={signIn}>
+          <p className="eyebrow">EMPLOYEE ACCESS</p>
+          <h2>Welcome back.</h2>
+          <p className="muted">Sign in to the Royal Tyres IT Service Desk.</p>
+          <div className="field">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              name="username"
+              autoComplete="username"
+              required
+              autoFocus
+            />
           </div>
-          <span className="login-caption">
-            Passenger · Commercial · Workshop · Internal IT
-          </span>
-        </section>
-        <section className="login-form-wrap">
-          <form className="login-form" onSubmit={signIn}>
-            <p className="eyebrow">EMPLOYEE ACCESS</p>
-            <h2>Welcome back.</h2>
-            <p className="muted">Sign in to the Royal Tyres IT Service Desk.</p>
-            <div className="field">
-              <label htmlFor="username">Username</label>
-              <input
-                id="username"
-                name="username"
-                autoComplete="username"
-                required
-                autoFocus
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            {error && (
-              <p className="notice error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="button primary full-width" disabled={signingIn}>
-              {signingIn ? 'Signing in…' : 'Sign in'}{' '}
-              <span aria-hidden="true">→</span>
-            </button>
-            <p className="login-footnote">
-              Use the demo credentials configured for this portal.
-              <br />
-              Your session ends when you refresh or close this page.
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          {error && (
+            <p className="notice error" role="alert">
+              {error}
             </p>
-          </form>
-        </section>
-      </main>
+          )}
+          <button className="button primary full-width" disabled={signingIn}>
+            {signingIn ? 'Signing in…' : 'Sign in'}{' '}
+            <span aria-hidden="true">→</span>
+          </button>
+          <p className="login-footnote">
+            Use the demo credentials configured for this portal.
+            <br />
+            Your session ends when you refresh or close this page.
+          </p>
+        </form>
+      </AuthLayout>
     );
+  }
 
   const match = path.match(/^\/requests\/(\d+)\/?$/);
   const isNewRequest = path === '/' || path === '/request' || path === '/request/';
@@ -215,98 +190,46 @@ export default function App() {
         ? `Request #${match[1]}`
         : 'New request';
 
+  let page;
+  if (isNewRequest) {
+    page = <RequestView api={api} navigate={navigate} />;
+  } else if (isDashboard) {
+    page = <DashboardView api={api} navigate={navigate} />;
+  } else if (isSettings) {
+    page = <SettingsView api={api} username={username} apiDocsUrl={apiDocsUrl} />;
+  } else if (match) {
+    page = (
+      <RequestDetailView
+        key={match[1]}
+        id={match[1]}
+        api={api}
+        navigate={navigate}
+      />
+    );
+  } else {
+    page = (
+      <section className="panel">
+        <h1>Page not found</h1>
+        <AppLink to="/dashboard" navigate={navigate}>
+          Go to dashboard
+        </AppLink>
+      </section>
+    );
+  }
+
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <Brand />
-        <p className="nav-label">WORKSPACE</p>
-        <nav aria-label="Main navigation">
-          <AppLink
-            to="/request"
-            navigate={navigate}
-            className={`nav-item ${isNewRequest ? 'active' : ''}`}
-            aria-current={isNewRequest ? 'page' : undefined}
-          >
-            <span aria-hidden="true">＋</span> New request
-          </AppLink>
-          <AppLink
-            to="/dashboard"
-            navigate={navigate}
-            className={`nav-item ${isDashboard || match ? 'active' : ''}`}
-            aria-current={isDashboard ? 'page' : undefined}
-          >
-            <span aria-hidden="true">▦</span> Dashboard
-          </AppLink>
-          <a
-            href={apiDocsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="nav-item"
-          >
-            <span aria-hidden="true">↗</span> API docs
-          </a>
-        </nav>
-        <div className="sidebar-bottom">
-          <span className="small-dot" /> Trusted since 1939 · Internal IT
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <span>
-            IT Service Desk <span className="breadcrumb">/ {breadcrumb}</span>
-          </span>
-          <div className="account">
-            <span className="avatar" aria-hidden="true">
-              {username.slice(0, 1).toUpperCase()}
-            </span>
-            <span>{username}</span>
-            <AppLink
-              to="/settings"
-              navigate={navigate}
-              className={`account-link ${isSettings ? 'active' : ''}`}
-              aria-current={isSettings ? 'page' : undefined}
-            >
-              Settings
-            </AppLink>
-            <button
-              onClick={() => {
-                setApi(null);
-                setUsername('');
-                setError('');
-              }}
-              className="signout"
-            >
-              Sign out
-            </button>
-          </div>
-        </header>
-        <main className="main-content">
-          {isNewRequest ? (
-            <RequestView api={api} navigate={navigate} />
-          ) : isDashboard ? (
-            <RequestsView api={api} navigate={navigate} />
-          ) : isSettings ? (
-            <SettingsView api={api} username={username} apiDocsUrl={apiDocsUrl} />
-          ) : match ? (
-            <RequestDetailView
-              key={match[1]}
-              id={match[1]}
-              api={api}
-              navigate={navigate}
-            />
-          ) : (
-            <section className="panel">
-              <h1>Page not found</h1>
-              <AppLink to="/dashboard" navigate={navigate}>
-                Go to dashboard
-              </AppLink>
-            </section>
-          )}
-        </main>
-        <footer className="workspace-footer">
-          Royal Tyres <span>IT Asset Request Tool</span>
-        </footer>
-      </div>
-    </div>
+    <AppLayout
+      navigate={navigate}
+      apiDocsUrl={apiDocsUrl}
+      username={username}
+      breadcrumb={breadcrumb}
+      isSettings={isSettings}
+      isNewRequest={isNewRequest}
+      isDashboard={isDashboard}
+      hasRequestMatch={Boolean(match)}
+      onSignOut={signOut}
+    >
+      {page}
+    </AppLayout>
   );
 }

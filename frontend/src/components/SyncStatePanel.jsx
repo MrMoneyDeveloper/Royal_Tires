@@ -1,14 +1,6 @@
 import StatusBadge from './StatusBadge.jsx';
+import { formatDateTime } from '../helpers/formatting.js';
 import './sync-state.css';
-
-function formatDate(value) {
-  return value
-    ? new Date(value).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : 'Not yet synced';
-}
 
 export default function SyncStatePanel({ record, refreshing, onRefresh }) {
   const linked = Boolean(record.zendesk_ticket_id);
@@ -22,7 +14,11 @@ export default function SyncStatePanel({ record, refreshing, onRefresh }) {
       </div>
       <div className="panel-heading sync-panel-heading">
         <div>
-          <h2>{linked ? `Zendesk ticket #${record.zendesk_ticket_id}` : 'Zendesk ticket pending'}</h2>
+          <h2>
+            {linked
+              ? `Zendesk ticket #${record.zendesk_ticket_id}`
+              : 'Zendesk ticket pending'}
+          </h2>
           <p className="muted">
             {linked
               ? 'This portal keeps the local request linked to Zendesk and receives agent status changes through the authenticated webhook.'
@@ -56,7 +52,9 @@ export default function SyncStatePanel({ record, refreshing, onRefresh }) {
         <div>
           <span>2</span>
           <strong>Zendesk</strong>
-          <small>{linked ? `Ticket #${record.zendesk_ticket_id}` : 'Awaiting link'}</small>
+          <small>
+            {linked ? `Ticket #${record.zendesk_ticket_id}` : 'Awaiting link'}
+          </small>
         </div>
         <b aria-hidden="true">→</b>
         <div>
@@ -69,19 +67,27 @@ export default function SyncStatePanel({ record, refreshing, onRefresh }) {
       <dl className="sync-details">
         <div>
           <dt>Portal status</dt>
-          <dd><StatusBadge status={record.status} /></dd>
+          <dd>
+            <StatusBadge status={record.status} />
+          </dd>
         </div>
         <div>
           <dt>Zendesk status</dt>
-          <dd><StatusBadge status={record.zendesk_status} /></dd>
+          <dd>
+            <StatusBadge status={record.zendesk_status} />
+          </dd>
         </div>
         <div>
           <dt>Sync state</dt>
-          <dd><StatusBadge status={record.zendesk_sync_status} /></dd>
+          <dd>
+            <StatusBadge status={record.zendesk_sync_status} />
+          </dd>
         </div>
         <div>
           <dt>Last successful sync</dt>
-          <dd>{formatDate(record.zendesk_last_synced_at)}</dd>
+          <dd>
+            {formatDateTime(record.zendesk_last_synced_at, 'Not yet synced')}
+          </dd>
         </div>
       </dl>
 

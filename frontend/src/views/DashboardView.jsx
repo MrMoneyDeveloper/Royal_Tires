@@ -1,16 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AppLink from '../components/AppLink.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { formatDateTime } from '../helpers/formatting.js';
 import './requests.css';
-
-function formatDate(value) {
-  return value
-    ? new Date(value).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : '—';
-}
 
 function isClosed(record) {
   return ['solved', 'closed'].includes((record.status || '').toLowerCase());
@@ -35,7 +27,7 @@ function matchesQuery(record, query) {
   );
 }
 
-export default function RequestsView({ api, navigate }) {
+export default function DashboardView({ api, navigate }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -217,7 +209,11 @@ export default function RequestsView({ api, navigate }) {
                 {filteredRecords.map((record) => (
                   <tr
                     key={record.id}
-                    className={record.zendesk_sync_status === 'sync_failed' ? 'queue-row-attention' : ''}
+                    className={
+                      record.zendesk_sync_status === 'sync_failed'
+                        ? 'queue-row-attention'
+                        : ''
+                    }
                   >
                     <td>
                       <AppLink
@@ -249,7 +245,7 @@ export default function RequestsView({ api, navigate }) {
                     <td>
                       <StatusBadge status={record.zendesk_sync_status} />
                     </td>
-                    <td>{formatDate(record.updated_at)}</td>
+                    <td>{formatDateTime(record.updated_at)}</td>
                     <td className="queue-open-cell">
                       <AppLink
                         className="queue-open-link"

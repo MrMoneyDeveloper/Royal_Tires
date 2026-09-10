@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core.security import require_user
-from app.database import get_db
-from app.schemas import ZendeskApplyRequest, ZendeskSetupStatus
+from app.data.session import get_db
+from app.schemas.zendesk_schema import ZendeskApplyRequest, ZendeskSetupStatus
 from app.services import legacy_trigger_guard, zendesk_service
 
 router = APIRouter(
