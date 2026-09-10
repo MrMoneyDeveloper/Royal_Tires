@@ -116,6 +116,7 @@ def test_connect_validates_login_and_returns_dry_run_plan(
     assert body["can_configure"] is True
     assert body["instance"] == "example.zendesk.com"
     assert body["plan"][0]["action"] == "create"
+    assert len(body["plan_fingerprint"]) == 64
 
     with zendesk_app.state.session_factory() as db:
         stored = db.get(ZendeskConnection, 1)
@@ -127,8 +128,24 @@ def test_connect_validates_login_and_returns_dry_run_plan(
 
 
 def test_apply_requires_explicit_confirmation(zendesk_client):
-    response = zendesk_client.post("/api/zendesk/apply", json={"confirm": False})
+    response = zendesk_client.post(
+        "/api/zendesk/apply",
+        json={"confirm": False, "plan_fingerprint": "0" * 64},
+    )
     assert response.status_code == 400
+
+
+def test_apply_rejects_stale_reviewed_plan(monkeypatch, zendesk_app, zendesk_client):
+    seed_configured_connection(zendesk_app)
+    monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials: [])
+
+    response = zendesk_client.post(
+        "/api/zendesk/apply",
+        json={"confirm": True, "plan_fingerprint": "0" * 64},
+    )
+
+    assert response.status_code == 409
+    assert "Refresh the dry-run plan" in response.json()["detail"]
 
 
 def test_apply_stores_discovered_configuration_ids(
@@ -167,7 +184,14 @@ def test_apply_stores_discovered_configuration_ids(
     )
     monkeypatch.setattr(zendesk_service, "build_setup_plan", lambda credentials: [])
 
-    response = zendesk_client.post("/api/zendesk/apply", json={"confirm": True})
+    preview = zendesk_client.get("/api/zendesk/setup")
+    assert preview.status_code == 200
+    fingerprint = preview.json()["plan_fingerprint"]
+
+    response = zendesk_client.post(
+        "/api/zendesk/apply",
+        json={"confirm": True, "plan_fingerprint": fingerprint},
+    )
 
     assert response.status_code == 200
     body = response.json()
