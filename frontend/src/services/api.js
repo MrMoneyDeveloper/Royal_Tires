@@ -71,5 +71,18 @@ export function createApi(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }),
+    getZendeskSetup: () => request('/api/zendesk/setup'),
+    connectZendesk: (data) =>
+      request('/api/zendesk/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+    applyZendeskSetup: () =>
+      request('/api/zendesk/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      }),
   };
 }
