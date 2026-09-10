@@ -1,26 +1,44 @@
 # Royal Tyres IT Asset Request Tool
 
-An internal IT asset request portal for Mohammed Farhaan Buckas's Royal Tyres technical interview. The authoritative architecture and implementation notes are in [PROJECT_SPEC.md](PROJECT_SPEC.md).
+A React + FastAPI IT Asset Request Tool built for the Royal Tyres **IT Developer Automation Engineer** technical review.
 
-React/Vite views call thin FastAPI controllers, which delegate to services, repositories and SQLAlchemy models. Local development uses SQLite. The hosted interview application uses Render Static Sites for the frontend, Render for FastAPI, Render PostgreSQL for persistence, and a Zendesk sandbox as the helpdesk integration.
+The application deliberately implements the requested vertical slice first, then demonstrates additional engineering practices around integration, testing, auditability, configuration and deployment. The authoritative implementation notes are in [PROJECT_SPEC.md](PROJECT_SPEC.md).
 
-The local SQL request is committed before any Zendesk call. A Zendesk outage therefore cannot discard an employee request.
+## Live demo
 
-[**Detailed file-by-file interview walkthrough**](docs/INTERVIEW_GUIDE.md) · [Authoritative project specification](PROJECT_SPEC.md)
+- **Frontend:** https://royal-tires-frontend.onrender.com
+- **Backend health:** https://royal-tires-api.onrender.com/health
+- **Swagger / OpenAPI:** https://royal-tires-api.onrender.com/docs
+- **Demo access:** credentials supplied separately during the interview.
 
-## Requirements covered
+## Interview requirements and current implementation
 
-- Validated asset requests, request tracking and service-desk Dashboard.
-- HTTP Basic Auth, explicit CORS, server-only secrets and safe text/SQL handling.
-- PostgreSQL request/audit persistence committed before external Zendesk calls.
-- Governed Zendesk discovery/apply, ticket creation and authenticated status callbacks.
-- Swagger/OpenAPI, backend/frontend tests, Vite build and Chromium E2E checks.
+| Requirement | Current implementation |
+| --- | --- |
+| Frontend asset-request form with validation | React/Vite request form with client-side validation and independent backend Pydantic validation. |
+| Backend API endpoint | FastAPI REST endpoints for creating, listing and retrieving asset requests, with generated Swagger/OpenAPI documentation. |
+| Store request in SQL or JSON | SQLAlchemy persistence with hosted Render PostgreSQL; SQLite is supported for local development and tests. |
+| Input validation / SQL Injection / XSS protection | Pydantic validates API boundaries, SQLAlchemy uses bound values instead of interpolated SQL, and React renders user-controlled values as escaped text. |
+| Basic Auth | Environment-configured HTTP Basic authentication protects the business API routes and simulates the logged-in user required by the brief. |
+| Logging or helpdesk ticket simulation | Application request logging, persisted PostgreSQL `AuditLog` history, and real Zendesk ticket creation provide both auditability and helpdesk simulation. |
+| Code hosted on GitHub | Public GitHub repository with pull-request history, automated CI, architecture diagrams and interview-oriented documentation. |
 
-## Live / demo links
+**Presentation format from the brief:** 0–15 minutes presentation/demo, followed by 16–30 minutes technical Q&A.
 
-[Frontend portal](https://royal-tires-frontend.onrender.com) · [Backend health](https://royal-tires-api.onrender.com/health) · [Swagger / OpenAPI](https://royal-tires-api.onrender.com/docs)
+## Additional engineering demonstrated
 
-Use separately supplied demo credentials. See the [recorded verification evidence](docs/LIVE_VERIFICATION.md) and its linked PR for prior live results; these diagrams do not claim a new live test or email delivery.
+- Zendesk REST API ticket integration.
+- Zendesk → FastAPI authenticated webhook status synchronization.
+- Audit history and cross-system ID correlation.
+- Runtime configuration and secret injection through environment variables.
+- PostgreSQL as the primary local system of record, committed before external Zendesk calls.
+- Failure isolation when Zendesk is unavailable.
+- GitHub Actions continuous integration.
+- pytest backend tests, frontend unit tests, Vite production build and Playwright E2E tests.
+- Render frontend/backend/PostgreSQL hosting.
+- Governed Zendesk configuration with dry-run planning, fingerprinted approval, drift detection and read-back verification.
+
+[**Detailed file-by-file interview walkthrough**](docs/INTERVIEW_GUIDE.md) · [**Recorded live verification evidence**](docs/LIVE_VERIFICATION.md) · [**Authoritative project specification**](PROJECT_SPEC.md)
 
 ## Architecture diagrams
 
@@ -30,53 +48,53 @@ All images are repository-owned SVGs. Open an image to zoom; [editable generator
 
 ![Royal Tyres IT Asset Request Tool — System architecture](docs/diagrams/01-system-architecture.svg)
 
-PostgreSQL is the primary local system of record. Outbound Zendesk calls and inbound authenticated callbacks go through FastAPI; the browser never calls Zendesk.
+PostgreSQL is the primary local system of record. Outbound Zendesk calls and inbound authenticated callbacks go through FastAPI; the browser never calls Zendesk directly.
 
 ### MVC-style layer flow
 
 ![Royal Tyres IT Asset Request Tool — MVC-style layer flow](docs/diagrams/02-code-layer-flow.svg)
 
-This is an MVC-style mental model, not traditional server-rendered ASP.NET MVC. Schema validation precedes the route body; Services own sequencing and Repositories use the injected Session.
+This is an MVC-style mental model, not traditional server-rendered ASP.NET MVC. Schema validation precedes the route body; Services own sequencing and Repositories use the injected SQLAlchemy Session.
 
 ### Create request sequence
 
 ![Royal Tyres IT Asset Request Tool — Create request sequence](docs/diagrams/03-create-request-sequence.svg)
 
-The primary request and creation audit commit before Zendesk is called. A ZendeskError leaves the request saved and records sync_failed in a second transaction.
+The primary request and creation audit commit before Zendesk is called. A Zendesk failure therefore leaves the local request safely persisted and records the integration failure separately.
 
 ### Identifiers and audit
 
 ![Royal Tyres IT Asset Request Tool — Identifiers and audit](docs/diagrams/04-identifiers-audit.svg)
 
-These are example values only. Local IDs, Zendesk IDs and deterministic correlation strings have different roles; AuditLog is persisted workflow history.
+The example values illustrate the distinction between the local database ID, Zendesk ticket ID and deterministic external correlation ID. `AuditLog` records form persisted workflow history linked back to the request.
 
 ### Zendesk webhook flow
 
 ![Royal Tyres IT Asset Request Tool — Zendesk webhook flow](docs/diagrams/05-zendesk-webhook-flow.svg)
 
-The callback normalizes status labels and authenticates with its own bearer secret. A supplied external ID is checked before state/audit commit; tracking polls the local API every 10 seconds.
+Zendesk status changes are posted back to FastAPI through a separately authenticated webhook. The callback validates and normalizes the event, verifies correlation and updates local state plus audit history.
 
 ### Environment and security
 
 ![Royal Tyres IT Asset Request Tool — Environment and security](docs/diagrams/06-environment-security.svg)
 
-Only environment names are shown. Runtime Settings feed database, authentication, CORS and integration components; CORS is not authentication.
+Runtime settings feed database connectivity, Basic Auth, CORS and Zendesk integration components. Environment values are supplied by the host rather than hard-coded into source control.
 
 ### CI pipeline
 
 ![Royal Tyres IT Asset Request Tool — CI pipeline](docs/diagrams/07-ci-pipeline.svg)
 
-This matches the current workflow commands, versions and triggers. CI validates code; Render auto-deployment is a separate mechanism.
+GitHub Actions validates backend tests, frontend unit tests, the Vite production build and Playwright browser tests. CI validation is separate from Render deployment.
 
 ### Frontend page flow
 
 ![Royal Tyres IT Asset Request Tool — Frontend page flow](docs/diagrams/08-frontend-page-flow.svg)
 
-App.jsx composes shared Layouts and page Views. api.js centralizes browser-to-FastAPI HTTP, while Settings exposes governed setup and backend Swagger links.
+`App.jsx` composes shared layouts and page Views. `api.js` centralizes browser-to-FastAPI HTTP communication, while Settings exposes governed Zendesk setup and developer links.
 
 ## Physical repository structure
 
-The repository now physically mirrors the MVC mental model documented in `PROJECT_SPEC.md` instead of keeping several unrelated responsibilities in root modules.
+The repository physically mirrors the MVC-style layered mental model used throughout the documentation.
 
 ```text
 frontend/src/
@@ -141,9 +159,9 @@ backend/app/
 └── main.py                # application composition root
 ```
 
-SQLAlchemy infrastructure lives exclusively in `backend/app/data/`. Controllers and services import the data/session modules directly; there is no root database compatibility facade.
+SQLAlchemy infrastructure lives in `backend/app/data/`. Controllers and services use the physical data/session modules directly; there is no root database compatibility facade.
 
-The interview explanation is therefore direct:
+The interview mental model is:
 
 ```text
 USER
@@ -152,13 +170,15 @@ VIEW / PARTIAL VIEW
   ↓
 CONTROLLER
   ↓
+SCHEMA VALIDATION
+  ↓
 SERVICE
   ↓
 REPOSITORY
   ↓
 MODEL
   ↓
-DB CONTEXT / SESSION
+DB CONTEXT / SESSION / ENGINE
   ↓
 POSTGRESQL
 ```
@@ -220,18 +240,18 @@ Business Reason validation is enforced independently on the frontend and backend
 | `ZENDESK_SUBDOMAIN` | Backend-only Zendesk sandbox subdomain |
 | `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` | Backend-only Zendesk API authentication |
 | `ZENDESK_WEBHOOK_SECRET` | Separate bearer secret for Zendesk → FastAPI status callbacks |
-| `ZENDESK_NOTIFICATION_EMAIL` | Demo email receiver; defaults to `farhaanhotd1@gmail.com` |
-| `ZENDESK_LEGACY_TRIGGER_GUARD_ENABLED` | Opt-in guard for the confirmed pre-existing sandbox triggers that must ignore Royal Tyres |
+| `ZENDESK_NOTIFICATION_EMAIL` | Demo email receiver |
+| `ZENDESK_LEGACY_TRIGGER_GUARD_ENABLED` | Opt-in guard for approved pre-existing sandbox triggers that must ignore Royal Tyres |
 | `RENDER_EXTERNAL_URL` | Render-provided public backend origin used for the webhook callback |
-| `VITE_API_URL` | Public API origin; frontend environment value |
+| `VITE_API_URL` | Public API origin used by the frontend |
 
 Zendesk credentials and webhook secrets never enter the React application.
 
 ## Security notes
 
-Basic Auth protects business routes over hosted HTTPS; the webhook uses a separate bearer secret. Pydantic validates API input, SQLAlchemy binds values as data, and React renders user-controlled values as text. CORS accepts explicit origins and does not authenticate callers.
+Basic Auth protects business routes over hosted HTTPS; the Zendesk webhook uses a separate bearer secret. Pydantic validates API input, SQLAlchemy binds values as data rather than interpolating them into raw SQL, and React renders user-controlled values as text. CORS accepts explicit browser origins and is not used as authentication.
 
-Credentials remain server-side except the portal credentials held in browser memory for Basic Auth. Never place secrets in Vite configuration, documentation or logs. PostgreSQL is primary; SQLite is only for local development/tests.
+Credentials remain server-side except the assignment-required portal credentials held in browser memory for Basic Auth. Secrets are not stored in Vite configuration, documentation or logs. PostgreSQL is primary; SQLite is only for local development/tests.
 
 ## Interview walkthrough
 
@@ -275,7 +295,7 @@ The project-owned plan covers the Royal Tyres Brand, IT Service Desk Group, tick
 Employee submits request
 → PostgreSQL commit
 → Zendesk ticket created
-→ demo notification email
+→ demo notification workflow
 → request appears in Dashboard
 → agent changes Zendesk status
 → Zendesk trigger calls authenticated FastAPI webhook
@@ -287,6 +307,6 @@ The request detail page refreshes its local API data every 10 seconds while open
 
 ### Pull request progression
 
-PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 added email notifications, webhook status callbacks and tracking-page synchronization. PR8 expanded the MVC architecture map. PR9 improved safe Zendesk validation diagnostics. PR10 fixed cross-field Zendesk option-tag collisions. PR11 added opt-in isolation for confirmed legacy sandbox triggers. PR12 fixed meaningful Business Reason validation. PR13 added the request queue and sync explanation. PR14 promoted the queue into the searchable Dashboard and moved Zendesk setup under Settings. PR15 added restrained GSAP motion and an automotive visual layer. PR16 aligned the palette with Royal Tyres red/charcoal branding. PR17 physically aligns the codebase with the documented MVC folder targets while preserving behavior.
+PR1–PR4 cover scaffold, core API, security and request UI. PR5 added governed Zendesk setup and ticket creation. PR6 corrected live Zendesk API field/view values. PR7 added email notifications, webhook status callbacks and tracking-page synchronization. PR8 expanded the MVC architecture map. PR9 improved safe Zendesk validation diagnostics. PR10 fixed cross-field Zendesk option-tag collisions. PR11 added opt-in isolation for confirmed legacy sandbox triggers. PR12 fixed meaningful Business Reason validation. PR13 added the request queue and sync explanation. PR14 promoted the queue into the searchable Dashboard and moved Zendesk setup under Settings. PR15 added restrained GSAP motion and an automotive visual layer. PR16 aligned the palette with Royal Tyres red/charcoal branding. PR17 physically aligned the codebase with the documented MVC folder targets. PR19 added final live integration evidence and interview documentation. PR20 added inline architectural handoff comments. PR21 added the rendered architecture diagrams.
 
 </details>
