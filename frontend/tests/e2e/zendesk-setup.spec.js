@@ -22,6 +22,16 @@ const plan = [
   details: key === 'email_target' ? 'Receiver: farhaanhotd1@gmail.com' : null,
 }));
 
+plan.push({
+  key: 'legacy_trigger_guard_1',
+  object_type: 'Existing trigger safeguard',
+  name: 'Issue Category 1',
+  action: 'update',
+  existing_id: 9001,
+  details:
+    'Add Brand IS NOT Royal Tyres; preserve every other condition/action/state; config ref abc123def456.',
+});
+
 const planFingerprint = 'a'.repeat(64);
 const common = {
   environment_configured: true,
@@ -29,7 +39,7 @@ const common = {
   notification_email: 'farhaanhotd1@gmail.com',
 };
 
-test('tests env credentials, previews and explicitly applies complete Zendesk workflow', async ({ page }) => {
+test('tests env credentials, previews governed changes and explicitly applies them', async ({ page }) => {
   let connected = false;
   let configured = false;
 
@@ -111,17 +121,17 @@ test('tests env credentials, previews and explicitly applies complete Zendesk wo
           plan: plan.map((item, index) => ({
             ...item,
             action: 'reuse',
-            existing_id: item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index,
+            existing_id: item.existing_id || (item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index),
           })),
           plan_fingerprint: 'b'.repeat(64),
           ids: { brand_id: 100, group_id: 101, ticket_form_id: 105, view_id: 106 },
           verification: plan.map((item, index) => ({
             object_type: item.object_type,
-            id: item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index,
+            id: item.existing_id || (item.object_type === 'Webhook' ? '01TESTWEBHOOK' : 100 + index),
             ok: true,
             result: 'PASS',
           })),
-          message: 'Zendesk configuration, demo email notifications and Track a request status sync were applied and verified successfully.',
+          message: 'Zendesk configuration, safeguards, demo email notifications and Track a request status sync were applied and verified successfully.',
         },
       });
     }
@@ -139,11 +149,16 @@ test('tests env credentials, previews and explicitly applies complete Zendesk wo
   await page.getByRole('button', { name: /Test environment connection/ }).click();
 
   await expect(page.getByText('example.zendesk.com')).toBeVisible();
+  await expect(page.getByText('Managed Royal Tyres configuration')).toBeVisible();
+  await expect(page.getByText('Existing sandbox safeguards')).toBeVisible();
+  await expect(page.getByText('Issue Category 1')).toBeVisible();
+  await expect(page.getByText('Brand IS NOT Royal Tyres', { exact: false })).toBeVisible();
   await expect(page.getByText('Royal Tyres | Demo Notifications')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Asset Status Sync')).toBeVisible();
   await expect(page.getByText('Royal Tyres | Sync Status to Asset Portal')).toBeVisible();
   await expect(page.getByText('Receiver: farhaanhotd1@gmail.com', { exact: true })).toBeVisible();
   await expect(page.getByText('CREATE').first()).toBeVisible();
+  await expect(page.getByText('UPDATE').first()).toBeVisible();
   await expect(page.getByText(/Reviewed plan ref:/)).toBeVisible();
 
   await page.getByText(/I reviewed this exact dry-run plan/).click();
