@@ -8,6 +8,10 @@ export const ASSET_TYPES = [
   'Other',
 ];
 
+export function meaningfulCharacterCount(value = '') {
+  return value.replace(/\s/g, '').length;
+}
+
 export function validateRequest(values) {
   const errors = {};
   const name = values.requester_name.trim();
@@ -19,7 +23,8 @@ export function validateRequest(values) {
     errors.requester_email = 'Enter a valid email address.';
   if (!ASSET_TYPES.includes(values.asset_type))
     errors.asset_type = 'Choose an asset from the list.';
-  if (reason.length < 10 || reason.length > 1000)
-    errors.reason = 'Explain your request in 10 to 1,000 characters.';
+  if (meaningfulCharacterCount(reason) < 10 || reason.length > 1000)
+    errors.reason =
+      'Explain your request using at least 10 non-whitespace characters (maximum 1,000 total).';
   return errors;
 }
