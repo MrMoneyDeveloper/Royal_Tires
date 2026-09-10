@@ -1,0 +1,17 @@
+flowchart TD
+    V[React View / Component] --> A[frontend/src/services/api.js]
+    A --> MI[Incoming middleware]
+    MI --> C[FastAPI Controller route boundary]
+    C --> P[Pydantic validates before route body]
+    P --> S[Service: workflow and transaction sequencing]
+    S --> R[Repository: ORM operations]
+    R --> M[SQLAlchemy Model]
+    M --> D[Session / Engine]
+    D --> DB[(PostgreSQL)]
+    S --> ZS[ZendeskService]
+    ZS --> Z[Zendesk REST API]
+    S -. returning response .-> MO[Outgoing middleware]
+    MO -.-> A
+    Core[Core: Settings / Security / Logging] -.-> C
+    Core -.-> S
+    Core -.-> D

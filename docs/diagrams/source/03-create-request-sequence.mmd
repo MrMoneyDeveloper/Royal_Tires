@@ -1,0 +1,33 @@
+sequenceDiagram
+    actor Employee
+    participant Form as AssetRequestForm / RequestView
+    participant API as frontend api.js
+    participant C as RequestController / AssetRequestCreate
+    participant S as RequestService
+    participant R as RequestRepository / AssetRequest Model
+    participant DB as PostgreSQL via Session
+    participant ZS as ZendeskService
+    participant Z as Zendesk Tickets API
+    Employee->>Form: Enter asset request
+    Form->>API: Validated form values
+    API->>C: POST /api/requests + Basic Auth
+    C->>C: FastAPI validates AssetRequestCreate
+    C->>S: Typed request and scoped Session
+    S->>R: Add AssetRequest
+    R->>DB: Stage insert; flush obtains local ID
+    S->>DB: Stage REQUEST_CREATED via AuditRepository
+    S->>DB: COMMIT primary request and audit
+    Note over S,Z: POSTGRESQL COMMIT OCCURS BEFORE ZENDESK CALL
+    S->>ZS: Create ticket for committed request
+    ZS->>Z: POST ticket with correlation ID
+    alt Zendesk succeeds
+        Z-->>ZS: Zendesk ticket ID and status
+        ZS-->>S: Ticket result
+        S->>DB: Store ticket ID, synced state and audit; COMMIT
+    else Expected Zendesk failure
+        ZS-->>S: Safe ZendeskError
+        S->>DB: KEEP request; mark sync_failed; audit failure; COMMIT
+    end
+    S-->>C: Persisted request
+    C-->>API: HTTP 201 response DTO
+    API-->>Form: Show local ID and integration state

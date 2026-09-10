@@ -1,0 +1,18 @@
+flowchart TD
+    ENV[Render environment] --> Config[core/config.py]
+    Config --> Settings[Pydantic BaseSettings to typed Settings]
+    Settings --> URL[DATABASE_URL]
+    URL --> Data[Data: Engine / Session]
+    Data --> DB[(PostgreSQL)]
+    Settings --> Credentials[APP_USERNAME / APP_PASSWORD]
+    Credentials --> Basic[Basic Auth]
+    Basic --> Routes[Protected business routes]
+    Settings --> ZCreds[ZENDESK_SUBDOMAIN / ZENDESK_EMAIL / ZENDESK_API_TOKEN]
+    ZCreds --> ZS[ZendeskService]
+    ZS --> Z[Zendesk]
+    Settings --> Hook[ZENDESK_WEBHOOK_SECRET / RENDER_EXTERNAL_URL]
+    Hook --> Callback[Separate authenticated webhook]
+    Settings --> Mail[ZENDESK_NOTIFICATION_EMAIL]
+    Mail --> ZS
+    Settings --> Origin[FRONTEND_URL]
+    Origin --> CORS[CORS allowed origins]

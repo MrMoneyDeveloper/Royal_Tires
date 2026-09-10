@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1510" viewBox="0 0 1200 1510" role="img" aria-labelledby="title desc">
+<title id="title">Runtime Configuration and Security</title><desc id="desc">Environment names only · secrets stay on the server. Royal Tyres IT Asset Request Tool. Read the accompanying README for implementation notes.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#1b1b1b"/></marker></defs>
+<rect width="1200" height="1510" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#111111">
+<rect x="40" y="34" width="7" height="73" fill="#d71920"/>
+<text x="64" y="52" font-size="16" font-weight="700" letter-spacing="1.2">ROYAL TYRES IT ASSET REQUEST TOOL</text>
+<text x="64" y="87" font-size="30" font-weight="700">Runtime Configuration and Security</text>
+<text x="64" y="115" font-size="18" fill="#52565b">Environment names only · secrets stay on the server</text>
+<text x="1145" y="75" text-anchor="end" font-size="28" font-weight="700" fill="#d71920">06</text>
+<g data-card="Render Environment Variables"><rect x="40" y="155" width="1120" height="195" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="186" font-size="21" fill="#111111" font-weight="700" text-anchor="start">Render Environment Variables</text>
+<text x="60" y="215" font-size="18" fill="#111111" font-weight="400" text-anchor="start">DATABASE_URL     APP_USERNAME     APP_PASSWORD     FRONTEND_URL</text>
+<text x="60" y="241" font-size="18" fill="#111111" font-weight="400" text-anchor="start">ZENDESK_SUBDOMAIN     ZENDESK_EMAIL     ZENDESK_API_TOKEN</text>
+<text x="60" y="267" font-size="18" fill="#111111" font-weight="400" text-anchor="start">ZENDESK_WEBHOOK_SECRET     ZENDESK_NOTIFICATION_EMAIL</text>
+<text x="60" y="293" font-size="18" fill="#111111" font-weight="400" text-anchor="start">RENDER_EXTERNAL_URL</text>
+</g>
+<polyline points="600,350 600,385" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="backend/app/core/config.py"><rect x="210" y="385" width="780" height="105" rx="7" fill="#1b1b1b" stroke="#1b1b1b" stroke-width="1.6"/>
+<text x="230" y="416" font-size="21" fill="white" font-weight="700" text-anchor="start">backend/app/core/config.py</text>
+<text x="230" y="445" font-size="18" fill="white" font-weight="400" text-anchor="start">Pydantic BaseSettings → typed Settings object</text>
+<text x="230" y="471" font-size="18" fill="white" font-weight="400" text-anchor="start">Host supplies runtime values; source code contains no deployed secrets.</text>
+</g>
+<polyline points="600,490 600,525" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="600,525 148,525 148,565" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="600,525 374,525 374,565" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="600,525 600,525 600,565" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="600,525 826,525 826,565" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="600,525 1052,525 1052,565" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g data-card="DATABASE_URL"><rect x="40" y="565" width="216" height="195" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="60" y="596" font-size="21" fill="#111111" font-weight="700" text-anchor="start">DATABASE_URL</text>
+<text x="60" y="625" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Data / Engine /</text>
+<text x="60" y="651" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Session</text>
+<text x="60" y="677" font-size="18" fill="#111111" font-weight="400" text-anchor="start">→ PostgreSQL</text>
+</g>
+<g data-card="APP_USERNAME"><rect x="266" y="565" width="216" height="195" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="286" y="596" font-size="21" fill="#111111" font-weight="700" text-anchor="start">APP_USERNAME</text>
+<text x="286" y="625" font-size="18" fill="#111111" font-weight="400" text-anchor="start">+ APP_PASSWORD</text>
+<text x="286" y="651" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Basic Auth →</text>
+<text x="286" y="677" font-size="18" fill="#111111" font-weight="400" text-anchor="start">protected API routes</text>
+</g>
+<g data-card="FRONTEND_URL"><rect x="492" y="565" width="216" height="195" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="512" y="596" font-size="21" fill="#111111" font-weight="700" text-anchor="start">FRONTEND_URL</text>
+<text x="512" y="625" font-size="18" fill="#111111" font-weight="400" text-anchor="start">CORS allowed origins</text>
+<text x="512" y="651" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Browser policy only</text>
+</g>
+<g data-card="ZENDESK_*"><rect x="718" y="565" width="216" height="195" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="738" y="596" font-size="21" fill="#111111" font-weight="700" text-anchor="start">ZENDESK_*</text>
+<text x="738" y="625" font-size="18" fill="#111111" font-weight="400" text-anchor="start">ZendeskService</text>
+<text x="738" y="651" font-size="18" fill="#111111" font-weight="400" text-anchor="start">→ Zendesk REST</text>
+<text x="738" y="677" font-size="18" fill="#111111" font-weight="400" text-anchor="start">URL/email configure</text>
+<text x="738" y="703" font-size="18" fill="#111111" font-weight="400" text-anchor="start">callback/notification</text>
+</g>
+<g data-card="WEBHOOK AUTH"><rect x="944" y="565" width="216" height="195" rx="7" fill="white" stroke="#bec3c8" stroke-width="1.6"/>
+<text x="964" y="596" font-size="21" fill="#111111" font-weight="700" text-anchor="start">WEBHOOK AUTH</text>
+<text x="964" y="625" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Webhook secret</text>
+<text x="964" y="651" font-size="18" fill="#111111" font-weight="400" text-anchor="start">→ separate bearer</text>
+<text x="964" y="677" font-size="18" fill="#111111" font-weight="400" text-anchor="start">authentication</text>
+</g>
+<text x="44" y="789" font-size="18" fill="#111111" font-weight="400" text-anchor="start">RENDER_EXTERNAL_URL → callback endpoint · ZENDESK_NOTIFICATION_EMAIL → email target</text>
+<g data-card="PYDANTIC"><rect x="40" y="805" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="836" font-size="21" fill="#111111" font-weight="700" text-anchor="start">PYDANTIC</text>
+<text x="60" y="865" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Validates incoming API data.</text>
+</g>
+<g data-card="SQLALCHEMY"><rect x="610" y="805" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="630" y="836" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SQLALCHEMY</text>
+<text x="630" y="865" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Uses bound / parameterized values.</text>
+<text x="630" y="891" font-size="18" fill="#111111" font-weight="400" text-anchor="start">No user-input SQL concatenation.</text>
+</g>
+<g data-card="REACT"><rect x="40" y="945" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="976" font-size="21" fill="#111111" font-weight="700" text-anchor="start">REACT</text>
+<text x="60" y="1005" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Renders user data as text.</text>
+<text x="60" y="1031" font-size="18" fill="#111111" font-weight="400" text-anchor="start">No dangerouslySetInnerHTML</text>
+<text x="60" y="1057" font-size="18" fill="#111111" font-weight="400" text-anchor="start">for user-controlled content.</text>
+</g>
+<g data-card="CORS"><rect x="610" y="945" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="630" y="976" font-size="21" fill="#111111" font-weight="700" text-anchor="start">CORS</text>
+<text x="630" y="1005" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Browser-origin policy.</text>
+<text x="630" y="1031" font-size="18" fill="#111111" font-weight="400" text-anchor="start">NOT authentication.</text>
+</g>
+<g data-card="BASIC AUTH"><rect x="40" y="1085" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="1116" font-size="21" fill="#111111" font-weight="700" text-anchor="start">BASIC AUTH</text>
+<text x="60" y="1145" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Assignment-required demo login.</text>
+<text x="60" y="1171" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Credentials on protected requests.</text>
+</g>
+<g data-card="SECRETS"><rect x="610" y="1085" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="630" y="1116" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SECRETS</text>
+<text x="630" y="1145" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Injected at runtime.</text>
+<text x="630" y="1171" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Not hard-coded into GitHub.</text>
+</g>
+<g data-card="SQL INJECTION"><rect x="40" y="1225" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="60" y="1256" font-size="21" fill="#111111" font-weight="700" text-anchor="start">SQL INJECTION</text>
+<text x="60" y="1285" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Input must not become</text>
+<text x="60" y="1311" font-size="18" fill="#111111" font-weight="400" text-anchor="start">executable SQL syntax.</text>
+</g>
+<g data-card="XSS"><rect x="610" y="1225" width="550" height="125" rx="7" fill="#f3f4f5" stroke="#d9dde0" stroke-width="1.6"/>
+<text x="630" y="1256" font-size="21" fill="#111111" font-weight="700" text-anchor="start">XSS</text>
+<text x="630" y="1285" font-size="18" fill="#111111" font-weight="400" text-anchor="start">Input must not become executable</text>
+<text x="630" y="1311" font-size="18" fill="#111111" font-weight="400" text-anchor="start">browser HTML / JavaScript.</text>
+</g>
+<path d="M40 1421 H1160" stroke="#d9dde0"/>
+<text x="44" y="1451" font-size="18" fill="#52565b" font-weight="400" text-anchor="start">HTTPS protects transport. CORS and input validation do not replace authentication.</text>
+</g></svg>
