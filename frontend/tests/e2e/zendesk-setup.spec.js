@@ -16,6 +16,8 @@ const plan = [
   existing_id: null,
 }));
 
+const planFingerprint = 'a'.repeat(64);
+
 test('connects, previews and explicitly applies Zendesk configuration', async ({ page }) => {
   let connected = false;
   let configured = false;
@@ -39,6 +41,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
               instance: 'example.zendesk.com',
               user: { name: 'Admin User', email: 'admin@example.com', role: 'admin' },
               plan,
+              plan_fingerprint: planFingerprint,
               ids: null,
               verification: [],
               message: 'Connection verified. Review the dry-run plan before applying configuration.',
@@ -50,6 +53,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
               instance: null,
               user: null,
               plan: [],
+              plan_fingerprint: planFingerprint,
               ids: null,
               verification: [],
               message: 'Connect a Zendesk sandbox to build the setup plan.',
@@ -68,6 +72,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
           instance: 'example.zendesk.com',
           user: { name: 'Admin User', email: 'admin@example.com', role: 'admin' },
           plan,
+          plan_fingerprint: planFingerprint,
           ids: null,
           verification: [],
           message: 'Connection verified. Review the plan and confirm before any Zendesk configuration is changed.',
@@ -77,7 +82,10 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
 
     if (url.pathname === '/api/zendesk/apply') {
       configured = true;
-      expect(request.postDataJSON()).toEqual({ confirm: true });
+      expect(request.postDataJSON()).toEqual({
+        confirm: true,
+        plan_fingerprint: planFingerprint,
+      });
       return route.fulfill({
         json: {
           connected: true,
@@ -90,6 +98,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
             action: 'reuse',
             existing_id: 100 + index,
           })),
+          plan_fingerprint: 'b'.repeat(64),
           ids: { brand_id: 100, group_id: 101, ticket_form_id: 105, view_id: 106 },
           verification: plan.map((item, index) => ({
             object_type: item.object_type,
@@ -120,8 +129,9 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
   await expect(page.getByText('Royal Tyres | IT Service Desk')).toBeVisible();
   await expect(page.getByText('CREATE').first()).toBeVisible();
   await expect(page.getByLabel('API token')).toHaveValue('');
+  await expect(page.getByText(/Reviewed plan ref:/)).toBeVisible();
 
-  await page.getByText(/I reviewed the dry-run plan/).click();
+  await page.getByText(/I reviewed this exact dry-run plan/).click();
   await page.getByRole('button', { name: /Apply configuration/ }).click();
 
   await expect(
