@@ -10,12 +10,12 @@ def test_record_invalid_includes_nested_field_validation():
     response = httpx.Response(422, json={
         "error": "RecordInvalid",
         "description": "Record validation errors",
-        "details": {"CustomFieldOptions": [
-            {"description": "An option tag is already in use.", "value": "private input"},
+        "details": {"base": [
+            {"description": "The tag <strong>other</strong> is already used in a custom field drop-down, multi-select or checkbox.", "value": "private input"},
         ]},
     })
     detail = zendesk_service._safe_zendesk_error(response)
-    assert "CustomFieldOptions: An option tag is already in use." in detail
+    assert "base: The tag <strong>other</strong> is already used" in detail
     assert "private input" not in detail
 
 

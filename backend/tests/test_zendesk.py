@@ -76,6 +76,56 @@ def test_dropdown_definitions_use_zendesk_tagger_api_type():
     assert zendesk_service.FIELD_DEFINITIONS["request_source_field"]["type"] == "tagger"
 
 
+def test_asset_field_does_not_reuse_an_unrelated_option_tag(monkeypatch):
+    credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
+    definition = zendesk_service.FIELD_DEFINITIONS["asset_type_field"]
+    existing = [{"id": 50, "title": "Query Types", "type": "tagger",
+                 "custom_field_options": [{"name": "Other", "value": "other"}]}]
+    monkeypatch.setattr(zendesk_service, "_list_all", lambda *args: existing)
+    calls = []
+
+    def create_field(credentials, method, path, payload=None):
+        calls.append((method, path))
+        options = payload["ticket_field"]["custom_field_options"]
+        assert {option["value"] for option in options}.isdisjoint({"other"})
+        assert next(option["value"] for option in options if option["name"] == "Other") == "rt_asset_other"
+        return {"ticket_field": {"id": 100}}
+
+    monkeypatch.setattr(zendesk_service, "_request_json", create_field)
+    assert zendesk_service._ensure_field(credentials, definition) == 100
+    assert calls == [("POST", "/api/v2/ticket_fields.json")]
+    assert existing[0]["custom_field_options"][0]["value"] == "other"
+
+
+def test_existing_managed_asset_field_is_reused_without_mutation(monkeypatch):
+    credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
+    definition = zendesk_service.FIELD_DEFINITIONS["asset_type_field"]
+    monkeypatch.setattr(zendesk_service, "_list_all", lambda *args: [{"id": 100, **definition}])
+    monkeypatch.setattr(zendesk_service, "_request_json", lambda *args: pytest.fail("REUSE must not write"))
+    assert zendesk_service._ensure_field(credentials, definition) == 100
+
+
+@pytest.mark.parametrize("asset", ["Laptop", "Monitor", "Mouse", "Keyboard", "Headset", "Docking Station", "Other"])
+def test_ticket_asset_value_matches_provisioned_field(monkeypatch, zendesk_app, zendesk_client, asset):
+    from app.models.asset_request import AssetRequest
+
+    seed_configured_connection(zendesk_app)
+    record = AssetRequest(id=27, **{**payload(), "asset_type": asset})
+    captured = {}
+
+    def create_ticket(credentials, method, path, body=None):
+        captured.update(body["ticket"])
+        return {"ticket": {"id": 98765, "status": "new"}}
+
+    monkeypatch.setattr(zendesk_service, "_request_json", create_ticket)
+    with zendesk_app.state.session_factory() as db:
+        zendesk_service.create_ticket(zendesk_app.state.settings, db, record)
+    selected = next(field["value"] for field in captured["custom_fields"] if field["id"] == 104)
+    option = next(option for option in zendesk_service.FIELD_DEFINITIONS["asset_type_field"]["custom_field_options"] if option["name"] == asset)
+    assert selected == option["value"]
+    assert selected.startswith("rt_asset_")
+
+
 def test_view_uses_valid_zendesk_subject_column_value(monkeypatch):
     credentials = zendesk_service.ZendeskCredentials("example", "admin@example.com", "secret-token")
     captured = {}
