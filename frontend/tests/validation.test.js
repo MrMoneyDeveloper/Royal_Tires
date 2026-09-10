@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   meaningfulCharacterCount,
   validateRequest,
-} from '../src/services/validation.js';
+} from '../src/helpers/validation.js';
 
 const valid = {
   requester_name: 'Test User',
