@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateRequest } from '../src/services/validation.js';
+import {
+  meaningfulCharacterCount,
+  validateRequest,
+} from '../src/services/validation.js';
 
 const valid = {
   requester_name: 'Test User',
@@ -44,4 +47,16 @@ test('enforces input length boundaries', () => {
     }),
     {},
   );
+});
+
+test('does not count spaces, tabs, or newlines toward the business reason minimum', () => {
+  const padded = 'ab\n\n\n\t   cd\n\n\n\nef';
+  assert.equal(meaningfulCharacterCount(padded), 6);
+  assert.ok(validateRequest({ ...valid, reason: padded }).reason);
+});
+
+test('accepts ten meaningful characters even when formatted across lines', () => {
+  const formatted = 'abcde\n\n  fghij';
+  assert.equal(meaningfulCharacterCount(formatted), 10);
+  assert.deepEqual(validateRequest({ ...valid, reason: formatted }), {});
 });

@@ -1,7 +1,8 @@
+import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 AssetType = Literal["Laptop", "Monitor", "Mouse", "Keyboard", "Headset", "Docking Station", "Other"]
 ZendeskTicketStatus = Literal["new", "open", "pending", "hold", "solved", "closed"]
@@ -14,6 +15,17 @@ class AssetRequestCreate(BaseModel):
     requester_email: EmailStr = Field(max_length=254)
     asset_type: AssetType
     reason: str = Field(min_length=10, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def require_meaningful_reason(cls, value: str) -> str:
+        # Whitespace can improve readability, but it must not satisfy the
+        # minimum business-context requirement by itself.
+        if len(re.sub(r"\s", "", value)) < 10:
+            raise ValueError(
+                "Business reason must contain at least 10 non-whitespace characters."
+            )
+        return value
 
 
 class AssetRequestResponse(BaseModel):
