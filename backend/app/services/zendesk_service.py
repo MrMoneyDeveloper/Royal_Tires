@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import base64
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
@@ -111,8 +112,8 @@ def _credentials_from_settings(settings: Settings) -> ZendeskCredentials:
     return ZendeskCredentials(normalize_subdomain(subdomain), email, token)
 
 
-def _safe_zendesk_error(response: httpx.Response) -> str:
-    """Extract only Zendesk's high-level error text, never credentials or request bodies."""
+def _safe_zendesk_error(response: httpx.Response, sensitive_values: tuple[str, ...] = ()) -> str:
+    """Expose validation messages, excluding raw values and known request secrets."""
     try:
         data = response.json()
     except ValueError:
@@ -121,7 +122,7 @@ def _safe_zendesk_error(response: httpx.Response) -> str:
         return ""
 
     parts: list[str] = []
-    for key in ("error", "description", "details"):
+    for key in ("error", "description"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             parts.append(value.strip())
@@ -131,7 +132,46 @@ def _safe_zendesk_error(response: httpx.Response) -> str:
                 if isinstance(nested, str) and nested.strip():
                     parts.append(nested.strip())
 
-    return " | ".join(dict.fromkeys(parts))[:400]
+    # RecordInvalid puts the useful reason under details.<field>[].description.
+    # Reading only message keys prevents input/value/authentication objects from
+    # being serialized wholesale into the browser response or application log.
+    details = data.get("details")
+    if isinstance(details, dict):
+        for field, errors in list(details.items())[:8]:
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.\[\]-]{0,79}", field):
+                continue
+            if field.lower() in {"token", "password", "secret", "authorization", "input", "value"}:
+                continue
+            entries = errors if isinstance(errors, list) else [errors]
+            for entry in entries[:3]:
+                if isinstance(entry, str):
+                    parts.append(f"{field}: {entry}")
+                elif isinstance(entry, dict):
+                    for key in ("description", "message", "title"):
+                        message = entry.get(key)
+                        if isinstance(message, str) and message.strip():
+                            parts.append(f"{field}: {message.strip()}")
+
+    detail = " | ".join(dict.fromkeys(parts))
+    for value in sorted(filter(None, sensitive_values), key=len, reverse=True):
+        detail = detail.replace(value, "[redacted]")
+    detail = re.sub(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/=_\-.]+", r"\1 [redacted]", detail)
+    return " ".join(detail.split())[:600]
+
+
+def _payload_secrets(payload) -> tuple[str, ...]:
+    """Keep any webhook authentication value out of upstream error messages."""
+    values = []
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key.lower() in {"token", "password", "secret", "authorization"} and isinstance(value, str):
+                values.append(value)
+            elif isinstance(value, (dict, list)):
+                values.extend(_payload_secrets(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            values.extend(_payload_secrets(item))
+    return tuple(values)
 
 
 def _request_json(
@@ -174,7 +214,12 @@ def _request_json(
             400,
         )
     if response.status_code >= 400:
-        detail = _safe_zendesk_error(response)
+        basic_value = base64.b64encode(
+            f"{credentials.email}/token:{credentials.token}".encode()
+        ).decode()
+        detail = _safe_zendesk_error(
+            response, (credentials.token, basic_value, *_payload_secrets(payload))
+        )
         logger.warning(
             "Zendesk API failure method=%s path=%s status=%s detail=%s",
             method,
