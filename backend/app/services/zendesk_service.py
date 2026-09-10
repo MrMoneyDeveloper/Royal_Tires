@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -21,8 +22,14 @@ FORM_NAME = "Royal Tyres | IT Asset Request"
 VIEW_NAME = "Royal Tyres | IT Asset Requests"
 PORTAL_TAG = "royal_tires_asset_portal"
 
+EMAIL_TARGET_NAME = "Royal Tyres | Demo Notifications"
+WEBHOOK_NAME = "Royal Tyres | Asset Status Sync"
+TRIGGER_NEW_EMAIL_NAME = "Royal Tyres | Notify Demo Receiver - New Request"
+TRIGGER_STATUS_EMAIL_NAME = "Royal Tyres | Notify Demo Receiver - Status Update"
+TRIGGER_STATUS_SYNC_NAME = "Royal Tyres | Sync Status to Asset Portal"
+EMAIL_TARGET_SUBJECT = "[Royal Tyres IT] Asset request update"
+
 # Zendesk calls a single-select dropdown a `tagger` in the Ticket Fields API.
-# `dropdown` is UI terminology and is not a valid ticket-field API type.
 FIELD_DEFINITIONS = {
     "asset_type_field": {
         "title": "RT | Asset Type",
@@ -105,7 +112,7 @@ def _credentials_from_settings(settings: Settings) -> ZendeskCredentials:
 
 
 def _safe_zendesk_error(response: httpx.Response) -> str:
-    """Extract only Zendesk's high-level error text, never request credentials/body."""
+    """Extract only Zendesk's high-level error text, never credentials or request bodies."""
     try:
         data = response.json()
     except ValueError:
@@ -114,20 +121,17 @@ def _safe_zendesk_error(response: httpx.Response) -> str:
         return ""
 
     parts: list[str] = []
-    for key in ("error", "description"):
+    for key in ("error", "description", "details"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             parts.append(value.strip())
         elif isinstance(value, dict):
-            title = value.get("title")
-            message = value.get("message")
-            if isinstance(title, str) and title.strip():
-                parts.append(title.strip())
-            if isinstance(message, str) and message.strip():
-                parts.append(message.strip())
+            for nested_key in ("title", "message", "description"):
+                nested = value.get(nested_key)
+                if isinstance(nested, str) and nested.strip():
+                    parts.append(nested.strip())
 
-    # Keep browser-facing diagnostics useful but bounded.
-    return " | ".join(dict.fromkeys(parts))[:300]
+    return " | ".join(dict.fromkeys(parts))[:400]
 
 
 def _request_json(
@@ -157,7 +161,7 @@ def _request_json(
             timeout=15.0,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "RoyalTyresAssetPortal/0.2",
+                "User-Agent": "RoyalTyresAssetPortal/0.3",
             },
         )
     except httpx.HTTPError as exc:
@@ -184,6 +188,8 @@ def _request_json(
             502,
         )
 
+    if response.status_code == 204 or not response.content:
+        return {}
     try:
         data = response.json()
     except ValueError as exc:
@@ -208,6 +214,12 @@ def _list_all(
     return items
 
 
+def _list_webhooks(credentials: ZendeskCredentials) -> list[dict]:
+    data = _request_json(credentials, "GET", "/api/v2/webhooks")
+    webhooks = data.get("webhooks", [])
+    return [item for item in webhooks if isinstance(item, dict)] if isinstance(webhooks, list) else []
+
+
 def _find_named(items: list[dict], wanted: str) -> dict | None:
     key = wanted.casefold()
     for item in items:
@@ -221,44 +233,48 @@ def _discover(credentials: ZendeskCredentials) -> dict[str, list[dict]]:
     return {
         "brands": _list_all(credentials, "/api/v2/brands.json", "brands"),
         "groups": _list_all(credentials, "/api/v2/groups.json", "groups"),
-        "fields": _list_all(
-            credentials, "/api/v2/ticket_fields.json", "ticket_fields"
-        ),
-        "forms": _list_all(
-            credentials, "/api/v2/ticket_forms.json", "ticket_forms"
-        ),
+        "fields": _list_all(credentials, "/api/v2/ticket_fields.json", "ticket_fields"),
+        "forms": _list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"),
         "views": _list_all(credentials, "/api/v2/views.json", "views"),
+        "targets": _list_all(credentials, "/api/v2/targets", "targets"),
+        "webhooks": _list_webhooks(credentials),
+        "triggers": _list_all(credentials, "/api/v2/triggers.json", "triggers"),
     }
 
 
+def _usable_id(value) -> int | str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
 def _plan_item(
-    key: str, object_type: str, name: str, match: dict | None
+    key: str,
+    object_type: str,
+    name: str,
+    match: dict | None,
+    details: str | None = None,
 ) -> dict:
-    object_id = match.get("id") if match else None
+    object_id = _usable_id(match.get("id")) if match else None
     return {
         "key": key,
         "object_type": object_type,
         "name": name,
-        "action": "reuse" if isinstance(object_id, int) else "create",
-        "existing_id": object_id if isinstance(object_id, int) else None,
+        "action": "reuse" if object_id is not None else "create",
+        "existing_id": object_id,
+        "details": details,
     }
 
 
-def build_setup_plan(credentials: ZendeskCredentials) -> list[dict]:
+def build_setup_plan(credentials: ZendeskCredentials, settings: Settings) -> list[dict]:
     current = _discover(credentials)
     plan = [
-        _plan_item(
-            "brand",
-            "Brand",
-            BRAND_NAME,
-            _find_named(current["brands"], BRAND_NAME),
-        ),
-        _plan_item(
-            "group",
-            "Group",
-            GROUP_NAME,
-            _find_named(current["groups"], GROUP_NAME),
-        ),
+        _plan_item("brand", "Brand", BRAND_NAME, _find_named(current["brands"], BRAND_NAME)),
+        _plan_item("group", "Group", GROUP_NAME, _find_named(current["groups"], GROUP_NAME)),
     ]
     for key, definition in FIELD_DEFINITIONS.items():
         plan.append(
@@ -271,17 +287,42 @@ def build_setup_plan(credentials: ZendeskCredentials) -> list[dict]:
         )
     plan.extend(
         [
+            _plan_item("ticket_form", "Ticket form", FORM_NAME, _find_named(current["forms"], FORM_NAME)),
+            _plan_item("view", "View", VIEW_NAME, _find_named(current["views"], VIEW_NAME)),
             _plan_item(
-                "ticket_form",
-                "Ticket form",
-                FORM_NAME,
-                _find_named(current["forms"], FORM_NAME),
+                "email_target",
+                "Email target",
+                EMAIL_TARGET_NAME,
+                _find_named(current["targets"], EMAIL_TARGET_NAME),
+                f"Receiver: {settings.zendesk_notification_email.strip()}",
             ),
             _plan_item(
-                "view",
-                "View",
-                VIEW_NAME,
-                _find_named(current["views"], VIEW_NAME),
+                "status_webhook",
+                "Webhook",
+                WEBHOOK_NAME,
+                _find_named(current["webhooks"], WEBHOOK_NAME),
+                "POST status changes back to the hosted FastAPI portal using bearer authentication.",
+            ),
+            _plan_item(
+                "trigger_new_email",
+                "Trigger",
+                TRIGGER_NEW_EMAIL_NAME,
+                _find_named(current["triggers"], TRIGGER_NEW_EMAIL_NAME),
+                "Active after approved apply; emails the demo receiver when a portal ticket is created.",
+            ),
+            _plan_item(
+                "trigger_status_email",
+                "Trigger",
+                TRIGGER_STATUS_EMAIL_NAME,
+                _find_named(current["triggers"], TRIGGER_STATUS_EMAIL_NAME),
+                "Active after approved apply; emails the demo receiver when ticket status changes.",
+            ),
+            _plan_item(
+                "trigger_status_sync",
+                "Trigger",
+                TRIGGER_STATUS_SYNC_NAME,
+                _find_named(current["triggers"], TRIGGER_STATUS_SYNC_NAME),
+                "Active after approved apply; updates Track a request through the authenticated webhook.",
             ),
         ]
     )
@@ -305,42 +346,65 @@ def is_configured_record(connection: ZendeskConnection) -> bool:
     return bool(all(getattr(connection, field) for field in ID_FIELDS))
 
 
+def _workflow_environment_ready(settings: Settings) -> bool:
+    secret = settings.zendesk_webhook_secret.get_secret_value().strip()
+    email = settings.zendesk_notification_email.strip()
+    url = settings.render_external_url.strip()
+    if not secret or not email or not url:
+        return False
+    parsed = urlsplit(url)
+    return parsed.scheme == "https" and bool(parsed.hostname)
+
+
+def _webhook_endpoint(settings: Settings) -> str:
+    if not _workflow_environment_ready(settings):
+        raise ZendeskError(
+            "Zendesk workflow setup requires ZENDESK_WEBHOOK_SECRET and the Render HTTPS public URL. Set ZENDESK_WEBHOOK_SECRET in Render, then refresh the plan.",
+            503,
+        )
+    return f"{settings.render_external_url.strip().rstrip('/')}/api/webhooks/zendesk"
+
+
 def _status(
     connection: ZendeskConnection | None,
+    settings: Settings,
     plan: list[dict] | None = None,
     verification: list[dict] | None = None,
     message: str = "",
     environment_configured: bool = True,
 ) -> dict:
+    workflow_ready = _workflow_environment_ready(settings)
+    common = {
+        "environment_configured": environment_configured,
+        "workflow_environment_ready": workflow_ready,
+        "notification_email": settings.zendesk_notification_email.strip() or None,
+        "plan": plan or [],
+        "verification": verification or [],
+        "message": message,
+    }
     if connection is None:
         return {
-            "environment_configured": environment_configured,
+            **common,
             "connected": False,
             "configured": False,
             "can_configure": False,
             "instance": None,
             "user": None,
-            "plan": [],
             "ids": None,
-            "verification": verification or [],
-            "message": message
-            or "Test the Zendesk environment connection to build the setup plan.",
+            "message": message or "Test the Zendesk environment connection to build the setup plan.",
         }
     return {
-        "environment_configured": environment_configured,
+        **common,
         "connected": True,
         "configured": is_configured_record(connection),
-        "can_configure": connection.connected_user_role == "admin",
+        "can_configure": connection.connected_user_role == "admin" and workflow_ready,
         "instance": f"{connection.subdomain}.zendesk.com",
         "user": {
             "name": connection.connected_user_name,
             "email": connection.connected_user_email,
             "role": connection.connected_user_role,
         },
-        "plan": plan or [],
         "ids": _ids(connection),
-        "verification": verification or [],
-        "message": message,
     }
 
 
@@ -356,6 +420,7 @@ def get_setup_status(db: Session, settings: Settings) -> dict:
     if not _environment_ready(settings):
         return _status(
             None,
+            settings,
             environment_configured=False,
             message="Zendesk environment variables are not configured on the backend.",
         )
@@ -364,6 +429,7 @@ def get_setup_status(db: Session, settings: Settings) -> dict:
     if connection is None:
         return _status(
             None,
+            settings,
             environment_configured=True,
             message="Zendesk credentials are present in the backend environment. Test the connection to build the dry-run plan.",
         )
@@ -375,32 +441,29 @@ def get_setup_status(db: Session, settings: Settings) -> dict:
     ):
         return _status(
             None,
+            settings,
             environment_configured=True,
             message="Zendesk environment values changed. Test the connection again before applying configuration.",
         )
 
-    plan = build_setup_plan(credentials)
-    return _status(
-        connection,
-        plan,
-        message=(
-            "Zendesk is configured and verified. You can rerun the plan safely."
+    plan = build_setup_plan(credentials, settings)
+    if not _workflow_environment_ready(settings):
+        message = "Connection verified. Add ZENDESK_WEBHOOK_SECRET in Render before applying the full notification and status-sync plan."
+    else:
+        message = (
+            "Zendesk is configured and verified. You can rerun the full plan safely."
             if is_configured_record(connection)
-            else "Connection verified. Review the dry-run plan before applying configuration."
-        ),
-    )
+            else "Connection verified. Review the complete dry-run plan before applying configuration."
+        )
+    return _status(connection, settings, plan, message=message)
 
 
 def connect(db: Session, settings: Settings) -> dict:
     credentials = _credentials_from_settings(settings)
-
-    # Validate Render-held credentials before saving any connection metadata.
     data = _request_json(credentials, "GET", "/api/v2/users/me.json")
     user = data.get("user") if isinstance(data, dict) else None
     if not isinstance(user, dict) or not isinstance(user.get("id"), int):
-        raise ZendeskError(
-            "Zendesk login succeeded but returned an invalid user response."
-        )
+        raise ZendeskError("Zendesk login succeeded but returned an invalid user response.")
 
     connection = get_connection(db)
     changed_instance = bool(
@@ -411,11 +474,7 @@ def connect(db: Session, settings: Settings) -> dict:
         )
     )
     if connection is None:
-        connection = ZendeskConnection(
-            id=1,
-            subdomain=credentials.subdomain,
-            api_email=credentials.email,
-        )
+        connection = ZendeskConnection(id=1, subdomain=credentials.subdomain, api_email=credentials.email)
         db.add(connection)
     else:
         connection.subdomain = credentials.subdomain
@@ -435,32 +494,22 @@ def connect(db: Session, settings: Settings) -> dict:
     db.commit()
     db.refresh(connection)
 
-    plan = build_setup_plan(credentials)
-    return _status(
-        connection,
-        plan,
-        message=(
-            "Connection verified from backend environment variables. Review the plan and confirm before any Zendesk configuration is changed."
-            if connection.connected_user_role == "admin"
-            else "Connection verified, but an admin user is required to create Zendesk configuration."
-        ),
-    )
+    plan = build_setup_plan(credentials, settings)
+    if connection.connected_user_role != "admin":
+        message = "Connection verified, but an admin user is required to create Zendesk configuration."
+    elif not _workflow_environment_ready(settings):
+        message = "Connection verified. Add ZENDESK_WEBHOOK_SECRET in Render before applying notifications and status sync."
+    else:
+        message = "Connection verified from backend environment variables. Review the complete plan and confirm before any Zendesk configuration is changed."
+    return _status(connection, settings, plan, message=message)
 
 
 def _ensure_brand(credentials: ZendeskCredentials) -> int:
-    existing = _find_named(
-        _list_all(credentials, "/api/v2/brands.json", "brands"), BRAND_NAME
-    )
+    existing = _find_named(_list_all(credentials, "/api/v2/brands.json", "brands"), BRAND_NAME)
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
-
     subdomain = f"{credentials.subdomain}-royal-tyres"[:99].strip("-")
-    data = _request_json(
-        credentials,
-        "POST",
-        "/api/v2/brands.json",
-        {"brand": {"name": BRAND_NAME, "subdomain": subdomain}},
-    )
+    data = _request_json(credentials, "POST", "/api/v2/brands.json", {"brand": {"name": BRAND_NAME, "subdomain": subdomain}})
     item = data.get("brand")
     if not isinstance(item, dict) or not isinstance(item.get("id"), int):
         raise ZendeskError("Zendesk did not return the created brand ID.")
@@ -468,18 +517,10 @@ def _ensure_brand(credentials: ZendeskCredentials) -> int:
 
 
 def _ensure_group(credentials: ZendeskCredentials) -> int:
-    existing = _find_named(
-        _list_all(credentials, "/api/v2/groups.json", "groups"), GROUP_NAME
-    )
+    existing = _find_named(_list_all(credentials, "/api/v2/groups.json", "groups"), GROUP_NAME)
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
-
-    data = _request_json(
-        credentials,
-        "POST",
-        "/api/v2/groups.json",
-        {"group": {"name": GROUP_NAME}},
-    )
+    data = _request_json(credentials, "POST", "/api/v2/groups.json", {"group": {"name": GROUP_NAME}})
     item = data.get("group")
     if not isinstance(item, dict) or not isinstance(item.get("id"), int):
         raise ZendeskError("Zendesk did not return the created group ID.")
@@ -487,10 +528,7 @@ def _ensure_group(credentials: ZendeskCredentials) -> int:
 
 
 def _ensure_field(credentials: ZendeskCredentials, definition: dict) -> int:
-    existing = _find_named(
-        _list_all(credentials, "/api/v2/ticket_fields.json", "ticket_fields"),
-        definition["title"],
-    )
+    existing = _find_named(_list_all(credentials, "/api/v2/ticket_fields.json", "ticket_fields"), definition["title"])
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
 
@@ -505,33 +543,17 @@ def _ensure_field(credentials: ZendeskCredentials, definition: dict) -> int:
     }
     if definition.get("custom_field_options"):
         field["custom_field_options"] = definition["custom_field_options"]
-
-    data = _request_json(
-        credentials,
-        "POST",
-        "/api/v2/ticket_fields.json",
-        {"ticket_field": field},
-    )
+    data = _request_json(credentials, "POST", "/api/v2/ticket_fields.json", {"ticket_field": field})
     item = data.get("ticket_field")
     if not isinstance(item, dict) or not isinstance(item.get("id"), int):
-        raise ZendeskError(
-            f"Zendesk did not return the field ID for {definition['title']}."
-        )
+        raise ZendeskError(f"Zendesk did not return the field ID for {definition['title']}.")
     return item["id"]
 
 
-def _ensure_form(
-    credentials: ZendeskCredentials,
-    brand_id: int,
-    field_ids: list[int],
-) -> int:
-    existing = _find_named(
-        _list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"),
-        FORM_NAME,
-    )
+def _ensure_form(credentials: ZendeskCredentials, brand_id: int, field_ids: list[int]) -> int:
+    existing = _find_named(_list_all(credentials, "/api/v2/ticket_forms.json", "ticket_forms"), FORM_NAME)
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
-
     data = _request_json(
         credentials,
         "POST",
@@ -555,12 +577,9 @@ def _ensure_form(
 
 
 def _ensure_view(credentials: ZendeskCredentials, group_id: int) -> int:
-    existing = _find_named(
-        _list_all(credentials, "/api/v2/views.json", "views"), VIEW_NAME
-    )
+    existing = _find_named(_list_all(credentials, "/api/v2/views.json", "views"), VIEW_NAME)
     if existing and isinstance(existing.get("id"), int):
         return existing["id"]
-
     data = _request_json(
         credentials,
         "POST",
@@ -570,29 +589,11 @@ def _ensure_view(credentials: ZendeskCredentials, group_id: int) -> int:
                 "title": VIEW_NAME,
                 "active": True,
                 "all": [
-                    {
-                        "field": "group_id",
-                        "operator": "is",
-                        "value": str(group_id),
-                    },
-                    {
-                        "field": "current_tags",
-                        "operator": "includes",
-                        "value": PORTAL_TAG,
-                    },
+                    {"field": "group_id", "operator": "is", "value": str(group_id)},
+                    {"field": "current_tags", "operator": "includes", "value": PORTAL_TAG},
                 ],
                 "any": [],
-                # Zendesk's API column value for the UI Subject column is
-                # `description`, not `subject`.
-                "output": {
-                    "columns": [
-                        "status",
-                        "requester",
-                        "description",
-                        "priority",
-                        "updated",
-                    ]
-                },
+                "output": {"columns": ["status", "requester", "description", "priority", "updated"]},
             }
         },
     )
@@ -602,16 +603,166 @@ def _ensure_view(credentials: ZendeskCredentials, group_id: int) -> int:
     return item["id"]
 
 
+def _ensure_email_target(credentials: ZendeskCredentials, settings: Settings) -> int:
+    existing = _find_named(_list_all(credentials, "/api/v2/targets", "targets"), EMAIL_TARGET_NAME)
+    if existing and isinstance(existing.get("id"), int):
+        return existing["id"]
+    email = settings.zendesk_notification_email.strip()
+    if not email:
+        raise ZendeskError("ZENDESK_NOTIFICATION_EMAIL is empty.", 503)
+    data = _request_json(
+        credentials,
+        "POST",
+        "/api/v2/targets",
+        {
+            "target": {
+                "type": "email_target",
+                "title": EMAIL_TARGET_NAME,
+                "email": email,
+                "subject": EMAIL_TARGET_SUBJECT,
+                "active": True,
+            }
+        },
+    )
+    item = data.get("target")
+    if not isinstance(item, dict) or not isinstance(item.get("id"), int):
+        raise ZendeskError("Zendesk did not return the created email target ID.")
+    return item["id"]
+
+
+def _ensure_webhook(credentials: ZendeskCredentials, settings: Settings) -> str:
+    existing = _find_named(_list_webhooks(credentials), WEBHOOK_NAME)
+    if existing and _usable_id(existing.get("id")) is not None:
+        return str(existing["id"])
+
+    secret = settings.zendesk_webhook_secret.get_secret_value().strip()
+    data = _request_json(
+        credentials,
+        "POST",
+        "/api/v2/webhooks",
+        {
+            "webhook": {
+                "name": WEBHOOK_NAME,
+                "status": "active",
+                "endpoint": _webhook_endpoint(settings),
+                "http_method": "POST",
+                "request_format": "json",
+                "subscriptions": ["conditional_ticket_events"],
+                "authentication": {
+                    "type": "bearer_token",
+                    "data": {"token": secret},
+                    "add_position": "header",
+                },
+            }
+        },
+    )
+    item = data.get("webhook")
+    webhook_id = _usable_id(item.get("id")) if isinstance(item, dict) else None
+    if webhook_id is None:
+        raise ZendeskError("Zendesk did not return the created webhook ID.")
+    return str(webhook_id)
+
+
+def _trigger_definition(title: str, conditions: dict, actions: list[dict]) -> dict:
+    return {
+        "title": title,
+        "active": True,
+        "conditions": conditions,
+        "actions": actions,
+    }
+
+
+def _ensure_trigger(credentials: ZendeskCredentials, definition: dict) -> int:
+    existing = _find_named(_list_all(credentials, "/api/v2/triggers.json", "triggers"), definition["title"])
+    if existing and isinstance(existing.get("id"), int):
+        return existing["id"]
+
+    # Zendesk can validate trigger conditions/actions without creating anything.
+    _request_json(credentials, "POST", "/api/v2/triggers/validate", {"trigger": definition})
+    data = _request_json(credentials, "POST", "/api/v2/triggers", {"trigger": definition})
+    item = data.get("trigger")
+    if not isinstance(item, dict) or not isinstance(item.get("id"), int):
+        raise ZendeskError(f"Zendesk did not return the trigger ID for {definition['title']}.")
+    return item["id"]
+
+
+def _new_request_email_trigger(target_id: int) -> dict:
+    body = (
+        "New Royal Tyres IT asset request\n\n"
+        "Zendesk ticket: #{{ticket.id}}\n"
+        "Subject: {{ticket.title}}\n"
+        "Status: {{ticket.status}}\n\n"
+        "This notification was generated by the Royal Tyres Asset Portal demo."
+    )
+    return _trigger_definition(
+        TRIGGER_NEW_EMAIL_NAME,
+        {
+            "all": [
+                {"field": "current_tags", "operator": "includes", "value": PORTAL_TAG},
+                {"field": "update_type", "value": "Create"},
+            ],
+            "any": [],
+        },
+        [{"field": "notification_target", "value": [str(target_id), body]}],
+    )
+
+
+def _status_email_trigger(target_id: int) -> dict:
+    body = (
+        "Royal Tyres IT asset request status updated\n\n"
+        "Zendesk ticket: #{{ticket.id}}\n"
+        "Subject: {{ticket.title}}\n"
+        "New status: {{ticket.status}}\n\n"
+        "The hosted Track a request page is updated by the companion webhook."
+    )
+    return _trigger_definition(
+        TRIGGER_STATUS_EMAIL_NAME,
+        {
+            "all": [
+                {"field": "current_tags", "operator": "includes", "value": PORTAL_TAG},
+                {"field": "update_type", "value": "Change"},
+                {"field": "status", "operator": "changed"},
+            ],
+            "any": [],
+        },
+        [{"field": "notification_target", "value": [str(target_id), body]}],
+    )
+
+
+def _status_sync_trigger(webhook_id: str) -> dict:
+    webhook_body = json.dumps(
+        {
+            "event": "status_changed",
+            "ticket_id": "{{ticket.id}}",
+            "external_id": "{{ticket.external_id}}",
+            "status": "{{ticket.status}}",
+        },
+        separators=(",", ":"),
+    )
+    return _trigger_definition(
+        TRIGGER_STATUS_SYNC_NAME,
+        {
+            "all": [
+                {"field": "current_tags", "operator": "includes", "value": PORTAL_TAG},
+                {"field": "update_type", "value": "Change"},
+                {"field": "status", "operator": "changed"},
+            ],
+            "any": [],
+        },
+        [{"field": "notification_webhook", "value": [webhook_id, webhook_body]}],
+    )
+
+
 def _verify_object(
     credentials: ZendeskCredentials,
     object_type: str,
-    object_id: int,
+    object_id: int | str,
     path: str,
     root_key: str,
 ) -> dict:
     data = _request_json(credentials, "GET", path)
     item = data.get(root_key)
-    ok = isinstance(item, dict) and item.get("id") == object_id
+    ok = isinstance(item, dict) and str(item.get("id")) == str(object_id)
     return {
         "object_type": object_type,
         "id": object_id,
@@ -623,13 +774,13 @@ def _verify_object(
 def apply_setup(db: Session, settings: Settings) -> dict:
     connection = get_connection(db)
     if connection is None:
-        raise ZendeskError(
-            "Test the Zendesk environment connection before applying configuration.",
-            400,
-        )
+        raise ZendeskError("Test the Zendesk environment connection before applying configuration.", 400)
     if connection.connected_user_role != "admin":
+        raise ZendeskError("A Zendesk admin user is required to apply configuration.", 403)
+    if not _workflow_environment_ready(settings):
         raise ZendeskError(
-            "A Zendesk admin user is required to apply configuration.", 403
+            "Add ZENDESK_WEBHOOK_SECRET in Render before applying the complete notification and status-sync configuration.",
+            503,
         )
 
     credentials = _credentials_from_settings(settings)
@@ -637,34 +788,45 @@ def apply_setup(db: Session, settings: Settings) -> dict:
         connection.subdomain != credentials.subdomain
         or connection.api_email.casefold() != credentials.email.casefold()
     ):
-        raise ZendeskError(
-            "Zendesk environment values changed. Test the connection again before applying configuration.",
-            409,
-        )
+        raise ZendeskError("Zendesk environment values changed. Test the connection again before applying configuration.", 409)
 
-    # Every ensure operation re-reads its object type immediately before mutation.
-    # A partial previous run therefore becomes REUSE + continue rather than duplicates.
+    # Dependency order mirrors the proven setup approach: data model first,
+    # then UI resources, then notification target/webhook, then active triggers.
+    # Every ensure re-reads Zendesk so partial prior runs are safely reusable.
     brand_id = _ensure_brand(credentials)
     group_id = _ensure_group(credentials)
-    asset_type_field_id = _ensure_field(
-        credentials, FIELD_DEFINITIONS["asset_type_field"]
-    )
-    local_request_id_field_id = _ensure_field(
-        credentials, FIELD_DEFINITIONS["local_request_id_field"]
-    )
-    request_source_field_id = _ensure_field(
-        credentials, FIELD_DEFINITIONS["request_source_field"]
-    )
+    asset_type_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["asset_type_field"])
+    local_request_id_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["local_request_id_field"])
+    request_source_field_id = _ensure_field(credentials, FIELD_DEFINITIONS["request_source_field"])
     ticket_form_id = _ensure_form(
         credentials,
         brand_id,
-        [
-            asset_type_field_id,
-            local_request_id_field_id,
-            request_source_field_id,
-        ],
+        [asset_type_field_id, local_request_id_field_id, request_source_field_id],
     )
     view_id = _ensure_view(credentials, group_id)
+    email_target_id = _ensure_email_target(credentials, settings)
+    webhook_id = _ensure_webhook(credentials, settings)
+    new_email_trigger_id = _ensure_trigger(credentials, _new_request_email_trigger(email_target_id))
+    status_email_trigger_id = _ensure_trigger(credentials, _status_email_trigger(email_target_id))
+    status_sync_trigger_id = _ensure_trigger(credentials, _status_sync_trigger(webhook_id))
+
+    verification = [
+        _verify_object(credentials, "Brand", brand_id, f"/api/v2/brands/{brand_id}.json", "brand"),
+        _verify_object(credentials, "Group", group_id, f"/api/v2/groups/{group_id}.json", "group"),
+        _verify_object(credentials, "Asset Type field", asset_type_field_id, f"/api/v2/ticket_fields/{asset_type_field_id}.json", "ticket_field"),
+        _verify_object(credentials, "Local Request ID field", local_request_id_field_id, f"/api/v2/ticket_fields/{local_request_id_field_id}.json", "ticket_field"),
+        _verify_object(credentials, "Request Source field", request_source_field_id, f"/api/v2/ticket_fields/{request_source_field_id}.json", "ticket_field"),
+        _verify_object(credentials, "Ticket form", ticket_form_id, f"/api/v2/ticket_forms/{ticket_form_id}.json", "ticket_form"),
+        _verify_object(credentials, "View", view_id, f"/api/v2/views/{view_id}.json", "view"),
+        _verify_object(credentials, "Email target", email_target_id, f"/api/v2/targets/{email_target_id}", "target"),
+        _verify_object(credentials, "Webhook", webhook_id, f"/api/v2/webhooks/{webhook_id}", "webhook"),
+        _verify_object(credentials, "New request email trigger", new_email_trigger_id, f"/api/v2/triggers/{new_email_trigger_id}.json", "trigger"),
+        _verify_object(credentials, "Status email trigger", status_email_trigger_id, f"/api/v2/triggers/{status_email_trigger_id}.json", "trigger"),
+        _verify_object(credentials, "Status sync trigger", status_sync_trigger_id, f"/api/v2/triggers/{status_sync_trigger_id}.json", "trigger"),
+    ]
+    if not all(item["ok"] for item in verification):
+        db.rollback()
+        raise ZendeskError("Zendesk configuration was applied but post-change verification failed.")
 
     connection.brand_id = brand_id
     connection.group_id = group_id
@@ -674,73 +836,17 @@ def apply_setup(db: Session, settings: Settings) -> dict:
     connection.ticket_form_id = ticket_form_id
     connection.view_id = view_id
     connection.configured_at = utc_now()
-
-    verification = [
-        _verify_object(
-            credentials,
-            "Brand",
-            brand_id,
-            f"/api/v2/brands/{brand_id}.json",
-            "brand",
-        ),
-        _verify_object(
-            credentials,
-            "Group",
-            group_id,
-            f"/api/v2/groups/{group_id}.json",
-            "group",
-        ),
-        _verify_object(
-            credentials,
-            "Asset Type field",
-            asset_type_field_id,
-            f"/api/v2/ticket_fields/{asset_type_field_id}.json",
-            "ticket_field",
-        ),
-        _verify_object(
-            credentials,
-            "Local Request ID field",
-            local_request_id_field_id,
-            f"/api/v2/ticket_fields/{local_request_id_field_id}.json",
-            "ticket_field",
-        ),
-        _verify_object(
-            credentials,
-            "Request Source field",
-            request_source_field_id,
-            f"/api/v2/ticket_fields/{request_source_field_id}.json",
-            "ticket_field",
-        ),
-        _verify_object(
-            credentials,
-            "Ticket form",
-            ticket_form_id,
-            f"/api/v2/ticket_forms/{ticket_form_id}.json",
-            "ticket_form",
-        ),
-        _verify_object(
-            credentials,
-            "View",
-            view_id,
-            f"/api/v2/views/{view_id}.json",
-            "view",
-        ),
-    ]
-    if not all(item["ok"] for item in verification):
-        db.commit()
-        raise ZendeskError(
-            "Zendesk configuration was applied but post-change verification failed."
-        )
-
     connection.verified_at = utc_now()
     db.commit()
     db.refresh(connection)
-    plan = build_setup_plan(credentials)
+
+    plan = build_setup_plan(credentials, settings)
     return _status(
         connection,
+        settings,
         plan,
         verification,
-        "Zendesk configuration applied and verified successfully.",
+        "Zendesk configuration, demo email notifications and Track a request status sync were applied and verified successfully.",
     )
 
 
@@ -759,16 +865,11 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
         connection.subdomain != credentials.subdomain
         or connection.api_email.casefold() != credentials.email.casefold()
     ):
-        raise ZendeskError(
-            "Zendesk environment values changed. Re-test the connection.", 503
-        )
+        raise ZendeskError("Zendesk environment values changed. Re-test the connection.", 503)
 
     payload = {
         "ticket": {
-            "subject": (
-                f"IT Asset Request #{record.id} - "
-                f"{record.asset_type} - {record.requester_name}"
-            ),
+            "subject": f"IT Asset Request #{record.id} - {record.asset_type} - {record.requester_name}",
             "comment": {
                 "body": (
                     f"IT asset request #{record.id}\n\n"
@@ -778,33 +879,17 @@ def create_ticket(settings: Settings, db: Session, record: AssetRequest) -> dict
                 ),
                 "public": False,
             },
-            "requester": {
-                "name": record.requester_name,
-                "email": record.requester_email,
-            },
+            "requester": {"name": record.requester_name, "email": record.requester_email},
             "external_id": f"royal-tires-asset-{record.id}",
             "brand_id": connection.brand_id,
             "group_id": connection.group_id,
             "ticket_form_id": connection.ticket_form_id,
             "custom_fields": [
-                {
-                    "id": connection.asset_type_field_id,
-                    "value": _asset_value(record.asset_type),
-                },
-                {
-                    "id": connection.local_request_id_field_id,
-                    "value": str(record.id),
-                },
-                {
-                    "id": connection.request_source_field_id,
-                    "value": PORTAL_TAG,
-                },
+                {"id": connection.asset_type_field_id, "value": _asset_value(record.asset_type)},
+                {"id": connection.local_request_id_field_id, "value": str(record.id)},
+                {"id": connection.request_source_field_id, "value": PORTAL_TAG},
             ],
-            "tags": [
-                "it_asset_request",
-                PORTAL_TAG,
-                f"local_request_{record.id}",
-            ],
+            "tags": ["it_asset_request", PORTAL_TAG, f"local_request_{record.id}"],
             "priority": "normal",
         }
     }
