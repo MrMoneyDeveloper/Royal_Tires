@@ -8,6 +8,7 @@ __pycache__/
 *.db
 *.db-*
 node_modules/
+.vite/
 dist/
 coverage/
 .vercel/
