@@ -72,11 +72,9 @@ export function createApi(
         body: JSON.stringify(data),
       }),
     getZendeskSetup: () => request('/api/zendesk/setup'),
-    connectZendesk: (data) =>
+    connectZendesk: () =>
       request('/api/zendesk/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
       }),
     applyZendeskSetup: (planFingerprint) =>
       request('/api/zendesk/apply', {
