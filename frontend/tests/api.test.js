@@ -29,6 +29,20 @@ test('sends Basic Auth and JSON to configured backend', async (t) => {
   assert.equal(JSON.parse(call[1].body).reason, 'Example reason');
 });
 
+test('tests Zendesk connection without sending credentials from the browser', async (t) => {
+  let call;
+  t.mock.method(globalThis, 'fetch', async (...args) => {
+    call = args;
+    return new Response('{"connected":true}', { status: 200 });
+  });
+
+  await createApi(credentials, options).connectZendesk();
+
+  assert.equal(call[0], 'https://api.example.com/api/zendesk/connect');
+  assert.equal(call[1].method, 'POST');
+  assert.equal(call[1].body, undefined);
+});
+
 test('sends the exact reviewed Zendesk plan fingerprint on apply', async (t) => {
   let call;
   t.mock.method(globalThis, 'fetch', async (...args) => {
