@@ -181,19 +181,17 @@ export default function ZendeskSetupView({ api }) {
                 </p>
               )}
 
-              {!setup.configured && (
-                <label className="confirm-box">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(event) => setConfirmed(event.target.checked)}
-                  />
-                  <span>
-                    I reviewed this exact dry-run plan. Create only the missing Royal
-                    Tyres configuration and do not delete unrelated Zendesk data.
-                  </span>
-                </label>
-              )}
+              <label className="confirm-box">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                />
+                <span>
+                  I reviewed this exact dry-run plan. Create only the missing Royal
+                  Tyres configuration and do not delete unrelated Zendesk data.
+                </span>
+              </label>
 
               <div className="action-row">
                 <button
@@ -203,14 +201,14 @@ export default function ZendeskSetupView({ api }) {
                     applying ||
                     !setup.can_configure ||
                     !setup.plan_fingerprint ||
-                    (!setup.configured && !confirmed)
+                    !confirmed
                   }
                   onClick={applyConfiguration}
                 >
                   {applying
                     ? 'Applying & verifying…'
                     : setup.configured
-                      ? 'Verify configuration again'
+                      ? 'Re-apply & verify configuration'
                       : 'Apply configuration'}
                   <span aria-hidden="true">→</span>
                 </button>
