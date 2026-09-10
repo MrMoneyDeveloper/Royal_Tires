@@ -18,7 +18,7 @@ const plan = [
 
 const planFingerprint = 'a'.repeat(64);
 
-test('connects, previews and explicitly applies Zendesk configuration', async ({ page }) => {
+test('tests env credentials, previews and explicitly applies Zendesk configuration', async ({ page }) => {
   let connected = false;
   let configured = false;
 
@@ -35,6 +35,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
       return route.fulfill({
         json: connected
           ? {
+              environment_configured: true,
               connected: true,
               configured,
               can_configure: true,
@@ -47,6 +48,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
               message: 'Connection verified. Review the dry-run plan before applying configuration.',
             }
           : {
+              environment_configured: true,
               connected: false,
               configured: false,
               can_configure: false,
@@ -56,16 +58,17 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
               plan_fingerprint: planFingerprint,
               ids: null,
               verification: [],
-              message: 'Connect a Zendesk sandbox to build the setup plan.',
+              message: 'Zendesk credentials are present in the backend environment. Test the connection to build the dry-run plan.',
             },
       });
     }
 
     if (url.pathname === '/api/zendesk/connect') {
       connected = true;
-      expect(request.postDataJSON().api_token).toBe('secret-token');
+      expect(request.postData()).toBeNull();
       return route.fulfill({
         json: {
+          environment_configured: true,
           connected: true,
           configured: false,
           can_configure: true,
@@ -75,7 +78,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
           plan_fingerprint: planFingerprint,
           ids: null,
           verification: [],
-          message: 'Connection verified. Review the plan and confirm before any Zendesk configuration is changed.',
+          message: 'Connection verified from backend environment variables. Review the plan and confirm before any Zendesk configuration is changed.',
         },
       });
     }
@@ -88,6 +91,7 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
       });
       return route.fulfill({
         json: {
+          environment_configured: true,
           connected: true,
           configured: true,
           can_configure: true,
@@ -119,16 +123,13 @@ test('connects, previews and explicitly applies Zendesk configuration', async ({
   await page.getByLabel('Password', { exact: true }).fill('test-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Connect Zendesk' })).toBeVisible();
-  await page.getByLabel('Zendesk domain or subdomain').fill('example');
-  await page.getByLabel('Zendesk admin email').fill('admin@example.com');
-  await page.getByLabel('API token').fill('secret-token');
-  await page.getByRole('button', { name: /Test & connect/ }).click();
+  await expect(page.getByRole('heading', { name: 'Zendesk configuration' })).toBeVisible();
+  await expect(page.getByText('Zendesk environment variables detected')).toBeVisible();
+  await page.getByRole('button', { name: /Test environment connection/ }).click();
 
   await expect(page.getByText('example.zendesk.com')).toBeVisible();
   await expect(page.getByText('Royal Tyres | IT Service Desk')).toBeVisible();
   await expect(page.getByText('CREATE').first()).toBeVisible();
-  await expect(page.getByLabel('API token')).toHaveValue('');
   await expect(page.getByText(/Reviewed plan ref:/)).toBeVisible();
 
   await page.getByText(/I reviewed this exact dry-run plan/).click();
