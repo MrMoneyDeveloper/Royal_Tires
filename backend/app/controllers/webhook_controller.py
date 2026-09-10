@@ -4,8 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.schemas import ZendeskStatusWebhook, ZendeskWebhookResponse
+from app.data.session import get_db
+from app.schemas.webhook_schema import ZendeskStatusWebhook, ZendeskWebhookResponse
 from app.services import webhook_service
 
 router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
@@ -15,9 +15,16 @@ Database = Annotated[Session, Depends(get_db)]
 def _require_zendesk_bearer(request: Request, authorization: str | None) -> None:
     expected = request.app.state.settings.zendesk_webhook_secret.get_secret_value().strip()
     if not expected:
-        raise HTTPException(status_code=503, detail="Zendesk webhook secret is not configured.")
+        raise HTTPException(
+            status_code=503,
+            detail="Zendesk webhook secret is not configured.",
+        )
     scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not token or not hmac.compare_digest(token, expected):
+    if (
+        scheme.lower() != "bearer"
+        or not token
+        or not hmac.compare_digest(token, expected)
+    ):
         raise HTTPException(status_code=401, detail="Invalid webhook authentication.")
 
 
@@ -32,9 +39,15 @@ def zendesk_status_webhook(
     try:
         record, changed = webhook_service.apply_zendesk_status(db, payload)
     except webhook_service.WebhookRequestNotFound as exc:
-        raise HTTPException(status_code=404, detail="Linked asset request was not found.") from exc
+        raise HTTPException(
+            status_code=404,
+            detail="Linked asset request was not found.",
+        ) from exc
     except webhook_service.WebhookIdentityMismatch as exc:
-        raise HTTPException(status_code=409, detail="Zendesk ticket identity did not match the local request.") from exc
+        raise HTTPException(
+            status_code=409,
+            detail="Zendesk ticket identity did not match the local request.",
+        ) from exc
 
     return {
         "ok": True,
