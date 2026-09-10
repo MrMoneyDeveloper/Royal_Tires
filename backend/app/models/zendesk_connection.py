@@ -1,3 +1,16 @@
+"""
+ROLE: ZendeskConnection Model: singleton zendesk_connection table
+CALLED BY: ZendeskService; metadata repository helpers
+CALLS: Declarative Base and SQLAlchemy columns
+DATA IN: Safe account metadata, managed IDs and verification timestamps
+DATA OUT: Persisted singleton metadata, conventionally id=1
+WHY: Reuse verified integration IDs without storing credentials in SQL.
+SECURITY / RELIABILITY: id is the local primary key. Brand/group/field/form/view IDs come from
+    Zendesk, not local foreign keys. API token remains in server configuration.
+FLOW: ZendeskService; metadata repository helpers -> this module -> Declarative Base and
+    SQLAlchemy columns
+"""
+
 from datetime import datetime
 
 from sqlalchemy import BigInteger, String

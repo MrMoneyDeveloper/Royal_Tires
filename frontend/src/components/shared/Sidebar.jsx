@@ -1,3 +1,14 @@
+/**
+ * ROLE: Shared component: primary navigation
+ * CALLED BY: AppLayout
+ * CALLS: Brand and AppLink
+ * DATA IN: Route flags, navigation callback and docs URL
+ * DATA OUT: Active navigation links
+ * WHY: Reuse navigation across authenticated Views.
+ * SECURITY / RELIABILITY: Swagger opens separately; no credentials are placed in its URL.
+ * FLOW: AppLayout -> this module -> Brand and AppLink
+ */
+
 import AppLink from '../AppLink.jsx';
 import Brand from './Brand.jsx';
 

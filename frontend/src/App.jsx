@@ -1,3 +1,16 @@
+/**
+ * ROLE: Client composition: routes and in-memory login state
+ * CALLED BY: main.jsx
+ * CALLS: api.js, page Views, AppLayout and AuthLayout
+ * DATA IN: Browser pathname and login form data
+ * DATA OUT: Selected page and authenticated API client passed as props
+ * WHY: Keep route/session composition outside page presentation.
+ * SECURITY / RELIABILITY: Login probes listRequests; credentials live in the API closure,
+ *     not localStorage. Refresh/sign-out drops that reference. Optional GSAP respects
+ *     reduced-motion preferences.
+ * FLOW: main.jsx -> this module -> api.js, page Views, AppLayout and AuthLayout
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import AppLink from './components/AppLink.jsx';
 import AppLayout from './layouts/AppLayout.jsx';

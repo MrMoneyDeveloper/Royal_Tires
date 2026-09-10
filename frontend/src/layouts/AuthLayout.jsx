@@ -1,3 +1,15 @@
+/**
+ * ROLE: Layout: reusable sign-in shell
+ * CALLED BY: App
+ * CALLS: Brand and children
+ * DATA IN: Login form child
+ * DATA OUT: Unauthenticated page presentation
+ * WHY: Keep visual shell separate from login behavior.
+ * SECURITY / RELIABILITY: App/api.js perform sign-in; layout does not authenticate or retain
+ *     credentials.
+ * FLOW: App -> this module -> Brand and children
+ */
+
 import Brand from '../components/shared/Brand.jsx';
 
 export default function AuthLayout({ children }) {

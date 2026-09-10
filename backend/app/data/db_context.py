@@ -1,3 +1,16 @@
+"""
+ROLE: Data infrastructure: SQLAlchemy engine construction
+CALLED BY: main.create_app
+CALLS: SQLAlchemy create_engine and SQLite connection event
+DATA IN: DATABASE_URL supplied through Settings
+DATA OUT: Engine with driver configuration and connection pool
+WHY: Keep driver/connection policy in one place.
+SECURITY / RELIABILITY: Normalizes PostgreSQL URLs to psycopg and enables local SQLite foreign
+    keys. pool_pre_ping checks reused connections. Data package approximates
+    ApplicationDbContext infrastructure; no literal Entity Framework DbContext exists.
+FLOW: main.create_app -> this module -> SQLAlchemy create_engine and SQLite connection event
+"""
+
 from sqlalchemy import create_engine, event
 
 

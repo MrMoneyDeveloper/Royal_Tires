@@ -1,3 +1,17 @@
+"""
+ROLE: Webhook Service: correlate and persist status callbacks
+CALLED BY: Webhook Controller after authentication
+CALLS: RequestRepository, AuditRepository and request identity helper
+DATA IN: Validated event and injected Session
+DATA OUT: Updated AssetRequest plus audit event and changed flag
+WHY: Own the status-update use case without HTTP routing concerns.
+SECURITY / RELIABILITY: Lookup uses the linked Zendesk ticket ID; a supplied external ID must
+    match. Repeated status events preserve state but refresh the timestamp and append a
+    receipt audit; no event-ordering guarantee is implemented.
+FLOW: Webhook Controller after authentication -> this module -> RequestRepository,
+    AuditRepository and request identity helper
+"""
+
 import logging
 
 from sqlalchemy.orm import Session

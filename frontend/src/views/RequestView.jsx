@@ -1,3 +1,16 @@
+/**
+ * ROLE: Page View: create request and show result
+ * CALLED BY: App for /request
+ * CALLS: AssetRequestForm, api.createRequest, AppLink and StatusBadge
+ * DATA IN: Form values and injected api/navigate
+ * DATA OUT: Created request summary or error
+ * WHY: Own page-level submission state without SQL or Zendesk HTTP logic.
+ * SECURITY / RELIABILITY: Renders response text normally. The backend, not this page,
+ *     guarantees commit-before-Zendesk.
+ * FLOW: App for /request -> this module -> AssetRequestForm, api.createRequest, AppLink and
+ *     StatusBadge
+ */
+
 import { useState } from 'react';
 import AssetRequestForm from '../components/AssetRequestForm.jsx';
 import AppLink from '../components/AppLink.jsx';

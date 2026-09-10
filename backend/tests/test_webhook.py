@@ -70,11 +70,12 @@ def test_webhook_requires_separate_bearer_secret(webhook_app, webhook_client):
     assert response.status_code == 401
 
 
-def test_webhook_updates_status_visible_to_tracking_api(webhook_app, webhook_client):
+@pytest.mark.parametrize("status", ["pending", "Pending", " PENDING "])
+def test_webhook_updates_status_visible_to_tracking_api(webhook_app, webhook_client, status):
     request_id = seed_request(webhook_app)
     response = webhook_client.post(
         "/api/webhooks/zendesk",
-        json=event("pending", f"royal-tires-asset-{request_id}"),
+        json=event(status, f"royal-tires-asset-{request_id}"),
         headers={"Authorization": "Bearer webhook-secret"},
     )
     assert response.status_code == 200
@@ -109,3 +110,13 @@ def test_webhook_rejects_mismatched_external_id(webhook_app, webhook_client):
         headers={"Authorization": "Bearer webhook-secret"},
     )
     assert response.status_code == 409
+
+
+@pytest.mark.parametrize("status", ["Unknown", "Pending<script>", 123])
+def test_webhook_rejects_unknown_status_after_normalization(webhook_app, webhook_client, status):
+    seed_request(webhook_app)
+    response = webhook_client.post(
+        "/api/webhooks/zendesk", json=event(status),
+        headers={"Authorization": "Bearer webhook-secret"},
+    )
+    assert response.status_code == 422

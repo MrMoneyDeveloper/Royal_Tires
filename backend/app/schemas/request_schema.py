@@ -1,3 +1,16 @@
+"""
+ROLE: Request/response Schemas: Pydantic DTO contracts
+CALLED BY: FastAPI Request Controller
+CALLS: Pydantic field checks and reason validator
+DATA IN: Untrusted request JSON; response ORM attributes
+DATA OUT: Validated AssetRequestCreate or serialized AssetRequestResponse
+WHY: Separate API validation from persisted database representation.
+SECURITY / RELIABILITY: Rejects extra fields, invalid email/assets/lengths. Reason must
+    contain 10 non-whitespace characters; valid formatting is preserved. A schema is not a
+    database table.
+FLOW: FastAPI Request Controller -> this module -> Pydantic field checks and reason validator
+"""
+
 import re
 from datetime import datetime
 from typing import Literal

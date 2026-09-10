@@ -1,3 +1,17 @@
+"""
+ROLE: Opt-in Service for explicitly approved legacy trigger exclusions
+CALLED BY: Zendesk Controller within governed setup
+CALLS: ZendeskService HTTP/discovery helpers
+DATA IN: Settings and discovered Royal Tyres brand ID
+DATA OUT: UPDATE/REUSE/SKIP plan and preservation verification
+WHY: Isolate known sandbox interference without disabling unrelated automation.
+SECURITY / RELIABILITY: Only listed titles may change. Adds Brand IS NOT Royal Tyres and
+    resends existing actions because updating conditions alone can clear actions. Snapshots
+    contribute to the controller plan; read-back compares protected properties.
+FLOW: Zendesk Controller within governed setup -> this module -> ZendeskService HTTP/discovery
+    helpers
+"""
+
 import hashlib
 import json
 from copy import deepcopy
@@ -12,7 +26,30 @@ LEGACY_TRIGGER_TITLES = (
     "Issue Type 6",
     "Request Type 6",
     "Query Type 5",
-    "hello world?",
+    "hello world",
+    "Issue Category 2 2",
+    "Request Type 5",
+    "Query Type 7",
+    "Issue Type 7",
+    "Request Type 7",
+    "Query Type 6 (2)",
+    "Query Type 8",
+    "Issue Type 8",
+    "Request Type 8",
+    "Query Type 7 (2)",
+    "Query Type 9",
+    "Query Type 10",
+    "Issue Type 9",
+    "Issue Type 10",
+    "Request Type 9",
+    "Request Type 10",
+    "Request Type 11",
+    "Request Type 6 (2)",
+    "Request Type 7 (2)",
+    "Request Type 8 (2)",
+    "Request Type 9 (2)",
+    "Request Type 10 (2)",
+    "Request Type 11 (2)",
 )
 
 
@@ -70,7 +107,7 @@ def _has_exclusion(trigger: dict, brand_id: int | None) -> bool:
 
 
 def build_plan(settings: Settings) -> list[dict]:
-    """Describe the seven narrow sandbox safeguards without mutating Zendesk."""
+    """Describe the explicitly approved narrow sandbox safeguards without mutating Zendesk."""
     credentials = zendesk_service._credentials_from_settings(settings)
     brands = zendesk_service._list_all(credentials, "/api/v2/brands.json", "brands")
     triggers = zendesk_service._list_all(credentials, "/api/v2/triggers.json", "triggers")
@@ -195,6 +232,11 @@ def apply_exclusions(settings: Settings, brand_id: int) -> list[dict]:
                 }
             )
             continue
+
+        if _trigger_snapshot(live) != _trigger_snapshot(summary):
+            raise zendesk_service.ZendeskError(
+                f"Zendesk trigger '{title}' changed since discovery; review a new plan.", 409
+            )
 
         original = deepcopy(live)
         payload = _update_payload(original, brand_id)

@@ -1,3 +1,16 @@
+"""
+ROLE: Data foundation: declarative Base and UTC timestamp type
+CALLED BY: SQLAlchemy Models; services use utc_now
+CALLS: SQLAlchemy declarative mapping and datetime
+DATA IN: Model definitions and database timestamp results
+DATA OUT: Shared metadata registry and UTC-aware values
+WHY: Share mapping infrastructure across models.
+SECURITY / RELIABILITY: UTCDateTime restores UTC metadata when SQLite returns naive values.
+    Base collects tables; it neither authenticates users nor owns business workflow.
+FLOW: SQLAlchemy Models; services use utc_now -> this module -> SQLAlchemy declarative mapping
+    and datetime
+"""
+
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime

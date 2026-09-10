@@ -1,3 +1,15 @@
+/**
+ * ROLE: Pure helper: request input checks
+ * CALLED BY: AssetRequestForm and unit tests
+ * CALLS: String/regex checks only
+ * DATA IN: Form values
+ * DATA OUT: Field error map and meaningful character count
+ * WHY: Keep reusable deterministic checks outside JSX.
+ * SECURITY / RELIABILITY: No business workflow or network access. Counts non-whitespace
+ *     characters; backend Pydantic remains the authoritative boundary.
+ * FLOW: AssetRequestForm and unit tests -> this module -> String/regex checks only
+ */
+
 export const ASSET_TYPES = [
   'Laptop',
   'Monitor',

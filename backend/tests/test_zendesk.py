@@ -124,6 +124,8 @@ def test_ticket_asset_value_matches_provisioned_field(monkeypatch, zendesk_app, 
     option = next(option for option in zendesk_service.FIELD_DEFINITIONS["asset_type_field"]["custom_field_options"] if option["name"] == asset)
     assert selected == option["value"]
     assert selected.startswith("rt_asset_")
+    assert captured["external_id"] == "royal-tires-asset-27"
+    assert "local_request_27" in captured["tags"]
 
 
 def test_view_uses_valid_zendesk_subject_column_value(monkeypatch):
@@ -314,6 +316,15 @@ def test_zendesk_failure_keeps_primary_request(monkeypatch, zendesk_app, zendesk
     seed_configured_connection(zendesk_app)
 
     def fail_create(settings, db, record):
+        from app.models.asset_request import AssetRequest
+
+        # A separate connection must see the primary commit before the external
+        # call fails; inspecting only the response would not prove this ordering.
+        with zendesk_app.state.session_factory() as persisted:
+            assert persisted.get(AssetRequest, record.id) is not None
+            assert persisted.scalar(
+                select(AuditLog.event_type).where(AuditLog.request_id == record.id)
+            ) == "REQUEST_CREATED"
         raise zendesk_service.ZendeskError("simulated outage")
 
     monkeypatch.setattr(zendesk_service, "create_ticket", fail_create)

@@ -1,3 +1,17 @@
+"""
+ROLE: Zendesk setup Controller and approval boundary
+CALLED BY: Settings / ZendeskSetupView through api.js
+CALLS: ZendeskService and optional legacy_trigger_guard
+DATA IN: Authenticated connect/setup calls or explicit confirmation plus SHA-256 fingerprint
+DATA OUT: Safe setup plan, verification results or HTTP errors
+WHY: Translate integration errors and bind approval to a freshly discovered plan.
+SECURITY / RELIABILITY: Rejects changed plans with 409. Connect reads Zendesk but saves local
+    connection metadata. Managed plan fingerprints describe identity/actions; they are not
+    full remote-object hashes.
+FLOW: Settings / ZendeskSetupView through api.js -> this module -> ZendeskService and optional
+    legacy_trigger_guard
+"""
+
 import hashlib
 import json
 from typing import Annotated

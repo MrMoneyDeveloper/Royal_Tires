@@ -1,3 +1,17 @@
+"""
+ROLE: AssetRequest Model: asset_requests SQL table
+CALLED BY: RequestService constructs; repositories and Data persist/query
+CALLS: Declarative Base and SQLAlchemy column mapping
+DATA IN: Requester, asset, reason and integration state
+DATA OUT: Persisted primary request entity
+WHY: Define the system-of-record representation independently of API DTOs.
+SECURITY / RELIABILITY: Database-generated id is the primary key. Nullable unique
+    zendesk_ticket_id is an external identifier, not a local foreign key. Hosted storage is
+    PostgreSQL; SQLite is for local/test use.
+FLOW: RequestService constructs; repositories and Data persist/query -> this module ->
+    Declarative Base and SQLAlchemy column mapping
+"""
+
 from datetime import datetime
 
 from sqlalchemy import BigInteger, String, Text

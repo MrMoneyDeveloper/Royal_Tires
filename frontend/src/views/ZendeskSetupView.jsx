@@ -1,3 +1,17 @@
+/**
+ * ROLE: Integration View: governed discovery and approval UI
+ * CALLED BY: SettingsView
+ * CALLS: api.getZendeskSetup/connectZendesk/applyZendeskSetup; local PlanRows
+ * DATA IN: Safe setup DTO, confirmation checkbox and plan fingerprint
+ * DATA OUT: CREATE/REUSE/UPDATE/SKIP rows and verification results
+ * WHY: Make intended external changes reviewable before submission.
+ * SECURITY / RELIABILITY: Changing/reloading the plan resets approval; 409 invalidates it.
+ *     Backend enforces the gate. Managed read-back PASS currently checks object IDs, not
+ *     every remote property; safeguard verification is stricter.
+ * FLOW: SettingsView -> this module -> api.getZendeskSetup/connectZendesk/applyZendeskSetup;
+ *     local PlanRows
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import './zendesk-setup.css';
 
