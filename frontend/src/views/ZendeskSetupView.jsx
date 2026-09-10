@@ -11,6 +11,7 @@ export default function ZendeskSetupView({ api }) {
 
   async function load() {
     setLoading(true);
+    setConfirmed(false);
     setError('');
     try {
       setSetup(await api.getZendeskSetup());
@@ -48,14 +49,15 @@ export default function ZendeskSetupView({ api }) {
   }
 
   async function applyConfiguration() {
-    if (!confirmed) return;
+    if (!confirmed || !setup?.plan_fingerprint) return;
     setApplying(true);
     setError('');
     try {
-      setSetup(await api.applyZendeskSetup());
+      setSetup(await api.applyZendeskSetup(setup.plan_fingerprint));
       setConfirmed(false);
     } catch (problem) {
       setError(problem.message);
+      if (problem.status === 409) setConfirmed(false);
     } finally {
       setApplying(false);
     }
@@ -189,6 +191,14 @@ export default function ZendeskSetupView({ api }) {
                 ))}
               </div>
 
+              {setup.plan_fingerprint && (
+                <p className="muted setup-copy">
+                  Reviewed plan ref: <code>{setup.plan_fingerprint.slice(0, 12)}</code>.
+                  If Zendesk changes before deployment, the backend refuses the apply
+                  and requires a fresh review.
+                </p>
+              )}
+
               {!setup.configured && (
                 <label className="confirm-box">
                   <input
@@ -197,7 +207,7 @@ export default function ZendeskSetupView({ api }) {
                     onChange={(event) => setConfirmed(event.target.checked)}
                   />
                   <span>
-                    I reviewed the dry-run plan. Create only the missing Royal
+                    I reviewed this exact dry-run plan. Create only the missing Royal
                     Tyres configuration and do not delete unrelated Zendesk data.
                   </span>
                 </label>
@@ -210,6 +220,7 @@ export default function ZendeskSetupView({ api }) {
                   disabled={
                     applying ||
                     !setup.can_configure ||
+                    !setup.plan_fingerprint ||
                     (!setup.configured && !confirmed)
                   }
                   onClick={applyConfiguration}
