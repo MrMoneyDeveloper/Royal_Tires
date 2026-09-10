@@ -3,7 +3,7 @@
 **Candidate:** Mohammed Farhaan Buckas  
 **Purpose:** Royal Tyres technical interview practical  
 **Hosting:** React/Vite on Vercel, FastAPI on Render, Render PostgreSQL, Zendesk sandbox  
-**Design goal:** A small full-stack application that is easy to explain while demonstrating persistence, security, controlled Zendesk provisioning, notifications, auditability and recoverable integration failure.
+**Design goal:** A small full-stack application that is easy to explain while demonstrating persistence, security, controlled Zendesk provisioning, notifications, auditability, recoverable integration failure, and a clear MVC-style solution map.
 
 ---
 
@@ -29,98 +29,1244 @@ The hosted solution must:
 14. email demo notifications for new requests and status changes;
 15. push Zendesk status changes back into PostgreSQL so **Track a request** reflects the agent-side status;
 16. provide Swagger/OpenAPI;
-17. use feature branches, pull requests and GitHub Actions CI.
+17. use feature branches, pull requests and GitHub Actions CI;
+18. keep the solution organized around an MVC mental model so every file has an obvious responsibility.
 
 Manual pull/reconciliation and the operations dashboard remain later enhancements. Do not add microservices, queues or infrastructure the practical does not need.
 
 ---
 
-# 2. Hosted Architecture
+# 2. Architecture Mental Model
+
+The project deliberately uses a familiar MVC-style mental model even though the implementation is split between React and FastAPI.
 
 ```text
-┌──────────────────────────────┐
-│ React + Vite on Vercel       │
-│ royal-tires.vercel.app       │
-│                              │
-│ Login                        │
-│ New Request                  │
-│ Track a Request              │
-│ Zendesk Setup                │
-└───────────────┬──────────────┘
-                │ HTTPS / JSON / Basic Auth
-                ▼
-┌────────────────────────────────────────┐
-│ FastAPI on Render                      │
-│ royal-tires-api.onrender.com           │
-│                                        │
-│ Request controller/service             │
-│ Zendesk setup controller/service       │
-│ Zendesk webhook controller/service     │
-│ Pydantic validation                    │
-│ Audit logging                          │
-│ Render-held secrets                    │
-└──────────┬───────────────────┬─────────┘
-           │                   │
-           ▼                   ▼
+USER
+ │
+ ▼
+VIEW
+React page / shared layout / partial component
+ │
+ │ HTTPS / JSON
+ ▼
+CONTROLLER
+FastAPI endpoint
+ │
+ ▼
+SERVICE
+Business use case / orchestration
+ │
+ ├──────────────► EXTERNAL INTEGRATION
+ │                Zendesk
+ │
+ ▼
+REPOSITORY
+Database operations
+ │
+ ▼
+MODEL
+SQLAlchemy entities
+ │
+ ▼
+DB CONTEXT
+SQLAlchemy engine / session / transaction boundary
+ │
+ ▼
+POSTGRESQL
+```
+
+Supporting layers:
+
+```text
+Schemas / DTOs / ViewModels
+    define request and response contracts
+
+Middleware
+    applies cross-cutting behavior around HTTP requests
+
+Helpers
+    contain small reusable pure utilities
+
+Core
+    configuration, authentication, logging and application-wide setup
+
+Shared Views / Partial Views
+    reusable React layout and UI components
+```
+
+The core request lifecycle to remember is:
+
+```text
+View → Controller → Service → Repository → Model → DbContext → Database
+```
+
+The response returns in the opposite direction.
+
+---
+
+# 3. ASP.NET MVC Concept Mapping
+
+The solution uses Python and React, but the architecture is intentionally mapped to familiar ASP.NET MVC concepts.
+
+| Familiar concept | This project |
+|---|---|
+| Model | SQLAlchemy models in `backend/app/models/` |
+| View | React page components in `frontend/src/views/` |
+| Shared View / Layout | reusable React shell/layout components |
+| Partial View | smaller reusable React components |
+| Controller | FastAPI routers in `backend/app/controllers/` |
+| Service | business logic in `backend/app/services/` |
+| Repository | SQLAlchemy data access functions |
+| DbContext | `database.py`, SQLAlchemy engine, Base and scoped Session |
+| ViewModel / DTO | Pydantic schemas in `backend/app/schemas.py` |
+| Middleware | FastAPI/CORS/request middleware around the controller pipeline |
+| Helpers | small reusable formatting/validation/integration utilities |
+| appsettings.json | Pydantic `Settings` + Render environment variables |
+| Dependency Injection | FastAPI `Depends()` and scoped database sessions |
+
+The names are a mental bridge. The implementation still follows the conventions of FastAPI, SQLAlchemy and React.
+
+---
+
+# 4. Current Physical Repository Map
+
+This is the **actual current code layout** on `main`.
+
+```text
+Royal_Tires/
+│
+├── PROJECT_SPEC.md
+├── README.md
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+├── backend/
+│   ├── .env.example
+│   ├── requirements.txt
+│   ├── pytest.ini
+│   │
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── repository.py
+│   │   ├── schemas.py
+│   │   │
+│   │   ├── controllers/
+│   │   │   ├── request_controller.py
+│   │   │   ├── zendesk_controller.py
+│   │   │   └── webhook_controller.py
+│   │   │
+│   │   ├── models/
+│   │   │   ├── asset_request.py
+│   │   │   ├── audit_log.py
+│   │   │   └── zendesk_connection.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── request_service.py
+│   │   │   ├── zendesk_service.py
+│   │   │   └── webhook_service.py
+│   │   │
+│   │   └── core/
+│   │       ├── config.py
+│   │       ├── security.py
+│   │       └── logging_config.py
+│   │
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_auth.py
+│       ├── test_health.py
+│       ├── test_requests.py
+│       ├── test_security.py
+│       ├── test_webhook.py
+│       └── test_zendesk.py
+│
+└── frontend/
+    ├── package.json
+    ├── playwright.config.js
+    ├── vercel.json
+    │
+    ├── src/
+    │   ├── main.jsx
+    │   ├── App.jsx
+    │   ├── styles.css
+    │   │
+    │   ├── views/
+    │   │   ├── RequestView.jsx
+    │   │   ├── RequestDetailView.jsx
+    │   │   ├── ZendeskSetupView.jsx
+    │   │   └── zendesk-setup.css
+    │   │
+    │   ├── components/
+    │   │   ├── AppLink.jsx
+    │   │   ├── AssetRequestForm.jsx
+    │   │   └── StatusBadge.jsx
+    │   │
+    │   └── services/
+    │       └── api.js
+    │
+    └── tests/
+        ├── *.test.js
+        └── e2e/
+```
+
+This layout already contains the important layers. The sections below define what each file means in the MVC mental model and where future refactors should move cross-cutting code.
+
+---
+
+# 5. Model Layer
+
+**Purpose:** represent persisted business data and database relationships.
+
+Current physical location:
+
+```text
+backend/app/models/
+```
+
+Current Models:
+
+## `asset_request.py`
+
+Represents one employee asset request.
+
+Conceptually:
+
+```text
+AssetRequest Model
+```
+
+Important persisted fields:
+
+```text
+id
+requester_name
+requester_email
+asset_type
+reason
+status
+zendesk_ticket_id
+zendesk_status
+zendesk_sync_status
+zendesk_last_synced_at
+created_at
+updated_at
+```
+
+## `audit_log.py`
+
+Represents durable business/integration audit events.
+
+Conceptually:
+
+```text
+AuditLog Model
+```
+
+Important events include:
+
+```text
+REQUEST_CREATED
+ZENDESK_TICKET_CREATED
+ZENDESK_CREATE_FAILED
+ZENDESK_WEBHOOK_RECEIVED
+ZENDESK_STATUS_CHANGED
+```
+
+## `zendesk_connection.py`
+
+Represents safe Zendesk connection metadata and verified configuration IDs.
+
+It stores metadata such as:
+
+```text
+subdomain
+api_email
+connected Zendesk user details
+brand_id
+group_id
+ticket_form_id
+asset_type_field_id
+local_request_id_field_id
+request_source_field_id
+view_id
+connected/configured/verified timestamps
+```
+
+The Zendesk API token is **not** stored in this Model. It remains in Render environment variables.
+
+### Model rule
+
+Models describe persisted state. Models should not contain HTTP endpoint logic, Zendesk API calls, UI rendering or unrelated orchestration.
+
+---
+
+# 6. View Layer
+
+**Purpose:** display information to the user and collect user input.
+
+Current physical location:
+
+```text
+frontend/src/views/
+```
+
+Current page-level Views:
+
+## `RequestView.jsx`
+
+Conceptual MVC View:
+
+```text
+New Asset Request View
+```
+
+Responsibilities:
+
+- display the new-request page;
+- render the request form;
+- submit through the frontend API service;
+- display success/failure state;
+- navigate to request tracking.
+
+## `RequestDetailView.jsx`
+
+Conceptual MVC View:
+
+```text
+Track a Request View
+```
+
+Responsibilities:
+
+- display one local request;
+- show Zendesk ticket and sync information;
+- allow manual refresh of local status;
+- poll the local API periodically while open.
+
+This View never needs Zendesk credentials.
+
+## `ZendeskSetupView.jsx`
+
+Conceptual MVC View:
+
+```text
+Zendesk Configuration View
+```
+
+Responsibilities:
+
+- show environment readiness;
+- initiate read-only Zendesk connection testing;
+- display CREATE/REUSE planning;
+- display plan fingerprint information;
+- capture explicit configuration approval;
+- display PASS/FAIL verification after apply.
+
+The View never receives the Zendesk API token or webhook secret.
+
+---
+
+# 7. Shared Views and Partial Views
+
+React does not use Razor Partial Views, but reusable React components serve the same mental purpose.
+
+## Current Partial View equivalents
+
+Current physical location:
+
+```text
+frontend/src/components/
+```
+
+### `AssetRequestForm.jsx`
+
+Conceptual mapping:
+
+```text
+Partial View: Asset Request Form
+```
+
+It owns the reusable form UI and frontend validation behavior.
+
+### `StatusBadge.jsx`
+
+Conceptual mapping:
+
+```text
+Partial View: Request Status Badge
+```
+
+It presents request/sync status consistently.
+
+### `AppLink.jsx`
+
+Conceptual mapping:
+
+```text
+Shared Partial: Application Navigation Link
+```
+
+It centralizes internal SPA navigation behavior.
+
+## Shared View / Layout equivalents currently inside `App.jsx`
+
+The application shell currently contains shared concerns such as:
+
+```text
+Brand
+Sidebar
+Topbar
+Navigation
+Account area
+Track-request form
+Workspace footer
+```
+
+These work today but are logically **Shared Views / Layouts**.
+
+Future refactor target:
+
+```text
+frontend/src/layouts/
+    AppLayout.jsx
+    AuthLayout.jsx
+
+frontend/src/components/shared/
+    Brand.jsx
+    Sidebar.jsx
+    Topbar.jsx
+    Footer.jsx
+    TrackRequestForm.jsx
+```
+
+The goal is not to create empty folders. Shared files should only be extracted when they contain a real reusable responsibility.
+
+---
+
+# 8. Controller Layer
+
+**Purpose:** own HTTP routes and translate HTTP input/output into service calls.
+
+Current physical location:
+
+```text
+backend/app/controllers/
+```
+
+## `request_controller.py`
+
+Conceptual MVC Controller:
+
+```text
+RequestController
+```
+
+Responsibilities:
+
+```text
+POST /api/requests
+GET  /api/requests
+GET  /api/requests/{id}
+```
+
+Controller responsibilities should remain:
+
+```text
+receive HTTP request
+apply authentication dependency
+accept validated schema
+call service
+return HTTP response
+```
+
+It should not contain SQL queries or Zendesk workflow logic.
+
+## `zendesk_controller.py`
+
+Conceptual MVC Controller:
+
+```text
+ZendeskController
+```
+
+Responsibilities:
+
+```text
+GET  /api/zendesk/setup
+POST /api/zendesk/connect
+POST /api/zendesk/apply
+```
+
+It controls the setup HTTP boundary while `zendesk_service.py` performs the actual integration work.
+
+## `webhook_controller.py`
+
+Conceptual MVC Controller:
+
+```text
+WebhookController
+```
+
+Responsibilities:
+
+```text
+POST /api/webhooks/zendesk
+```
+
+It validates the inbound webhook boundary and delegates status synchronization to the webhook service.
+
+### Controller rule
+
+Controllers should stay thin.
+
+A useful test is:
+
+```text
+If a controller starts deciding business workflow, calling SQL directly,
+or implementing Zendesk payload rules, move that work into a Service.
+```
+
+---
+
+# 9. Service Layer
+
+**Purpose:** own business use cases, sequencing and orchestration.
+
+Current physical location:
+
+```text
+backend/app/services/
+```
+
+## `request_service.py`
+
+Conceptual service:
+
+```text
+RequestService
+```
+
+Responsibilities:
+
+- create the local request;
+- create its audit event;
+- commit primary persistence before Zendesk;
+- request Zendesk ticket creation;
+- update local Zendesk sync information;
+- preserve the request if Zendesk fails.
+
+## `zendesk_service.py`
+
+Conceptual service:
+
+```text
+ZendeskService
+```
+
+Responsibilities:
+
+- validate environment-held Zendesk credentials;
+- discover live Zendesk configuration;
+- build the dry-run plan;
+- create/reuse managed configuration;
+- validate trigger definitions;
+- verify created/reused objects;
+- construct and submit Zendesk ticket payloads;
+- keep secrets server-side.
+
+This is the current external-integration service and is intentionally separate from request controllers.
+
+## `webhook_service.py`
+
+Conceptual service:
+
+```text
+WebhookService
+```
+
+Responsibilities:
+
+- process validated Zendesk callback data;
+- find the linked local request;
+- validate its external ID relationship;
+- update local/Zendesk status fields;
+- keep duplicate callbacks idempotent;
+- write audit events.
+
+### Service rule
+
+Services own **why and in what order** operations happen.
+
+Controllers own HTTP. Repositories own SQL. Models own persisted state.
+
+---
+
+# 10. Repository Layer
+
+**Purpose:** isolate database access from business orchestration.
+
+Current physical location:
+
+```text
+backend/app/repository.py
+```
+
+Conceptual mapping:
+
+```text
+Repository layer
+```
+
+Typical responsibilities:
+
+```text
+create AssetRequest
+get AssetRequest by ID
+list AssetRequests
+find by Zendesk ticket ID
+add AuditLog
+persist safe Zendesk configuration metadata
+```
+
+Future organization, if the single file becomes too large:
+
+```text
+backend/app/repositories/
+    request_repository.py
+    audit_repository.py
+    zendesk_repository.py
+```
+
+A Repository should not decide whether a Zendesk call occurs before or after a database commit. That decision belongs to the Service layer.
+
+---
+
+# 11. DbContext / Data Layer
+
+The project is not using Entity Framework Core, so there is no literal EF `DbContext` class.
+
+For the MVC mental model, the following current code is the **DbContext equivalent**:
+
+```text
+backend/app/database.py
+```
+
+It owns:
+
+```text
+Declarative Base
+SQLAlchemy engine creation
+SQLite/PostgreSQL URL handling
+connection options
+scoped Session creation
+get_db() dependency
+transaction/session lifetime
+UTC database timestamp behavior
+```
+
+The application also creates `session_factory` during app startup and exposes scoped sessions through FastAPI dependency injection.
+
+Conceptual mapping:
+
+```text
+ASP.NET ApplicationDbContext
+        ↓
+SQLAlchemy engine + Base + Session factory + get_db()
+```
+
+Future folder target, only if a refactor improves readability:
+
+```text
+backend/app/data/
+    base.py
+    db_context.py
+    session.py
+```
+
+The name `DbContext` may be used in documentation as a teaching/mental-model alias, but the implementation remains standard SQLAlchemy.
+
+---
+
+# 12. Schemas / DTOs / ViewModels
+
+**Purpose:** define the shape and validation rules of data crossing HTTP/service boundaries.
+
+Current physical location:
+
+```text
+backend/app/schemas.py
+```
+
+Conceptual mapping:
+
+```text
+Pydantic Schema
+    = DTO / Request Model / Response Model / ViewModel boundary
+```
+
+Examples include:
+
+```text
+AssetRequestCreate
+AssetRequestResponse
+ZendeskApplyRequest
+ZendeskSetupStatus
+webhook request/response structures
+```
+
+Schemas should own validation such as:
+
+- required fields;
+- email format;
+- allowed asset types;
+- field lengths;
+- unexpected input rejection;
+- API response shape.
+
+Future organization if the file grows:
+
+```text
+backend/app/schemas/
+    request_schema.py
+    zendesk_schema.py
+    webhook_schema.py
+```
+
+---
+
+# 13. Middleware Layer
+
+**Purpose:** handle cross-cutting HTTP behavior that applies around Controllers rather than inside individual business use cases.
+
+Current middleware behavior is partly defined directly in:
+
+```text
+backend/app/main.py
+```
+
+Current cross-cutting responsibilities include:
+
+- CORS configuration;
+- request method/route/status logging;
+- `X-Content-Type-Options: nosniff`;
+- `Cache-Control: no-store` for API responses;
+- safe global validation/exception handling.
+
+Conceptual request pipeline:
+
+```text
+HTTP Request
+    ↓
+Middleware / CORS / security headers
+    ↓
+Controller
+    ↓
+Service
+    ↓
+Repository / Integration
+    ↓
+Controller Response
+    ↓
+Middleware
+    ↓
+HTTP Response
+```
+
+Future organization:
+
+```text
+backend/app/middleware/
+    request_logging.py
+    security_headers.py
+```
+
+Middleware must not contain request-specific business workflow such as asset creation or Zendesk provisioning.
+
+---
+
+# 14. Helpers
+
+**Purpose:** hold small reusable utilities that do not deserve their own Service and do not own business workflow.
+
+There is not currently a dedicated `helpers/` folder. Some helper-like logic currently lives close to the Services/Core code that uses it.
+
+Future examples:
+
+```text
+backend/app/helpers/
+    datetime_helper.py
+    zendesk_helper.py
+    validation_helper.py
+
+frontend/src/helpers/
+    formatting.js
+    validation.js
+```
+
+Good Helper examples:
+
+```text
+normalize a Zendesk subdomain
+map Laptop → laptop field value
+format a timestamp for display
+build a stable external ID string
+```
+
+Bad Helper examples:
+
+```text
+create an entire Zendesk setup
+save an asset request
+synchronize a ticket status
+```
+
+Those are Services because they represent business use cases.
+
+---
+
+# 15. Core Layer
+
+**Purpose:** hold application-wide infrastructure concerns.
+
+Current physical location:
+
+```text
+backend/app/core/
+```
+
+## `config.py`
+
+Conceptual role:
+
+```text
+Application Settings / appsettings equivalent
+```
+
+Reads environment variables and exposes safe typed settings.
+
+## `security.py`
+
+Conceptual role:
+
+```text
+Authentication / authorization infrastructure
+```
+
+Implements Basic Auth credential checking and security dependencies.
+
+## `logging_config.py`
+
+Conceptual role:
+
+```text
+Application logging configuration
+```
+
+Core should not contain request or Zendesk business workflow.
+
+---
+
+# 16. Frontend Service Layer
+
+Current physical location:
+
+```text
+frontend/src/services/api.js
+```
+
+Conceptual role:
+
+```text
+ApiService / HTTP client
+```
+
+It owns browser-to-FastAPI communication such as:
+
+```text
+list requests
+get request
+create request
+read Zendesk setup status
+test Zendesk environment connection
+apply approved Zendesk plan
+```
+
+React Views call this frontend Service rather than scattering raw `fetch()` calls across page components.
+
+---
+
+# 17. Application Entry Point / Composition Root
+
+## Backend
+
+```text
+backend/app/main.py
+```
+
+Conceptual role:
+
+```text
+Application startup / composition root
+```
+
+It should primarily:
+
+- create FastAPI;
+- create/configure the database engine;
+- register middleware;
+- register Controllers/routers;
+- register exception handlers;
+- expose health endpoint;
+- configure app-level dependencies/state.
+
+Business workflow should remain outside `main.py`.
+
+## Frontend
+
+```text
+frontend/src/main.jsx
+frontend/src/App.jsx
+```
+
+`main.jsx` bootstraps React.
+
+`App.jsx` currently owns routing/session/application-shell behavior. Shared layout responsibilities can later be extracted into layout/shared components without changing application behavior.
+
+---
+
+# 18. SOLID Principles Applied to This Project
+
+SOLID is used as a practical design guide rather than as interview vocabulary pasted over the codebase.
+
+## S — Single Responsibility Principle
+
+Each layer has one clear reason to change:
+
+```text
+View        → UI/display changes
+Controller  → HTTP route/boundary changes
+Service     → business workflow changes
+Repository  → database access changes
+Model       → persisted entity changes
+DbContext   → database/session configuration changes
+Schema      → API contract/validation changes
+Middleware  → cross-cutting HTTP behavior changes
+Helper      → small reusable utility changes
+Core        → app-wide configuration/security/logging changes
+```
+
+Examples:
+
+- changing the Zendesk ticket payload belongs in `ZendeskService`, not `RequestController`;
+- changing SQL lookup behavior belongs in the Repository, not the React View;
+- changing page presentation belongs in a View/Partial View, not a Model.
+
+## O — Open/Closed Principle
+
+The application should allow extension without rewriting unrelated layers.
+
+Examples:
+
+- adding another notification workflow should not require rewriting the request Controller;
+- adding another asset option should flow through validation/mapping without changing database infrastructure;
+- a future ServiceNow integration could be added through another integration Service instead of mixing ServiceNow code into Zendesk controllers.
+
+## L — Liskov Substitution Principle
+
+The current project does not rely heavily on inheritance, so this principle is intentionally lightweight.
+
+If repository or integration interfaces are introduced later, replacements must preserve the expected contract.
+
+Example:
+
+```text
+PostgreSQL request repository
+and a test/in-memory repository
+must both satisfy the same service expectations.
+```
+
+Do not invent inheritance purely to demonstrate this principle.
+
+## I — Interface Segregation Principle
+
+Keep contracts narrow.
+
+Examples:
+
+- Request persistence should not expose Zendesk credential methods;
+- webhook processing should not need configuration-provisioning methods;
+- frontend Views should only receive the API functions they need.
+
+Avoid one giant interface/service containing every operation in the application.
+
+## D — Dependency Inversion Principle
+
+Higher-level workflow should depend on clear service/repository/integration boundaries rather than embedding infrastructure everywhere.
+
+Current implementation already separates Controllers, Services and database access, although it still imports concrete Python functions rather than using a full interface container.
+
+For this interview scope that is acceptable. A production system could introduce Protocols/interfaces and dependency injection where testing or multiple implementations justify them.
+
+---
+
+# 19. Commenting and Documentation Standard
+
+Comments should explain **why**, not narrate obvious code.
+
+Good comment:
+
+```text
+Re-read Zendesk immediately before mutation so the system cannot deploy a
+configuration different from the plan the administrator approved.
+```
+
+Bad comment:
+
+```text
+Set current fingerprint.
+```
+
+Rules:
+
+1. use short docstrings for public service functions when purpose or side effects are not obvious;
+2. comment security boundaries, transaction decisions, failure-isolation behavior and unusual Zendesk API constraints;
+3. explain idempotency and retry assumptions where relevant;
+4. do not comment simple assignments, loops or framework boilerplate;
+5. never place secrets, credentials or real tokens in comments;
+6. keep comments synchronized with behavior;
+7. prefer descriptive names over compensating for unclear code with paragraphs of comments.
+
+---
+
+# 20. Naming Convention
+
+Physical code follows language conventions:
+
+```text
+Python files/functions    snake_case
+Python classes            PascalCase
+React components          PascalCase
+JavaScript functions      camelCase
+Environment variables     UPPER_SNAKE_CASE
+API paths                  lower-case REST paths
+```
+
+Documentation may use conceptual names such as:
+
+```text
+RequestController
+RequestService
+RequestRepository
+AssetRequest Model
+DbContext
+RequestView
+Partial View
+Shared View
+```
+
+These conceptual names exist to make the architecture easy to explain even where the actual filename follows Python/React conventions.
+
+---
+
+# 21. End-to-End Request Mapping
+
+This section maps the most important application flows file by file.
+
+## Flow A — Create a new asset request
+
+```text
+Employee
+  ↓
+RequestView.jsx                         VIEW
+  ↓
+AssetRequestForm.jsx                    PARTIAL VIEW
+  ↓
+frontend/src/services/api.js            FRONTEND SERVICE
+  ↓
+POST /api/requests
+  ↓
+request_controller.py                   CONTROLLER
+  ↓
+schemas.py                              DTO / VALIDATION
+  ↓
+request_service.py                      SERVICE
+  ↓
+repository.py                           REPOSITORY
+  ↓
+asset_request.py + audit_log.py         MODELS
+  ↓
+database.py                             DB CONTEXT
+  ↓
+PostgreSQL                              DATABASE
+  ↓
+COMMIT LOCAL REQUEST FIRST
+  ↓
+zendesk_service.py                      EXTERNAL-INTEGRATION SERVICE
+  ↓
+Zendesk Tickets API                     EXTERNAL SYSTEM
+  ↓
+update local Zendesk ID/sync state
+  ↓
+Controller response
+  ↓
+RequestView / RequestDetailView         VIEW
+```
+
+The critical reliability decision is that PostgreSQL is committed before Zendesk ticket creation.
+
+## Flow B — Track an existing request
+
+```text
+Employee enters local request ID
+  ↓
+RequestDetailView.jsx                   VIEW
+  ↓
+frontend API service
+  ↓
+GET /api/requests/{id}
+  ↓
+request_controller.py                   CONTROLLER
+  ↓
+request_service.py                      SERVICE
+  ↓
+repository.py                           REPOSITORY
+  ↓
+AssetRequest Model
+  ↓
+database.py / Session                   DB CONTEXT
+  ↓
+PostgreSQL
+  ↓
+response
+  ↓
+RequestDetailView.jsx                   VIEW
+```
+
+## Flow C — Configure Zendesk
+
+```text
+Admin
+  ↓
+ZendeskSetupView.jsx                    VIEW
+  ↓
+frontend API service
+  ↓
+POST /api/zendesk/connect
+  ↓
+zendesk_controller.py                   CONTROLLER
+  ↓
+zendesk_service.py                      SERVICE
+  ↓
+Zendesk API                             EXTERNAL SYSTEM
+  ↓
+read Brand / Group / Fields / Form / View / Targets / Webhooks / Triggers
+  ↓
+return CREATE / REUSE plan
+  ↓
+ZendeskSetupView.jsx                    VIEW
+  ↓
+Human approves fingerprint
+  ↓
+POST /api/zendesk/apply
+  ↓
+zendesk_controller.py                   CONTROLLER
+  ↓
+zendesk_service.py                      SERVICE
+  ↓
+create/reuse + verify Zendesk resources
+  ↓
+ZendeskConnection Model
+  ↓
+database.py / PostgreSQL                DB CONTEXT / DATABASE
+```
+
+## Flow D — Zendesk status change updates Track a Request
+
+```text
+Zendesk agent changes ticket status
+  ↓
+Zendesk Trigger
+  ↓
+Zendesk Webhook
+  ↓
+POST /api/webhooks/zendesk
+  ↓
+webhook_controller.py                   CONTROLLER
+  ↓
+webhook_service.py                      SERVICE
+  ↓
+repository/database access              REPOSITORY
+  ↓
+AssetRequest + AuditLog                  MODELS
+  ↓
+PostgreSQL                               DATABASE
+  ↓
+RequestDetailView polling
+  ↓
+GET /api/requests/{id}
+  ↓
+updated status appears in VIEW
+```
+
+---
+
+# 22. Hosted Architecture
+
+```text
+┌────────────────────────────────────┐
+│ VIEW LAYER                         │
+│ React + Vite on Vercel             │
+│                                    │
+│ RequestView                        │
+│ RequestDetailView                  │
+│ ZendeskSetupView                   │
+│ Shared / Partial components        │
+└──────────────────┬─────────────────┘
+                   │ HTTPS / JSON / Basic Auth
+                   ▼
+┌────────────────────────────────────┐
+│ CONTROLLER / SERVICE LAYERS        │
+│ FastAPI on Render                  │
+│                                    │
+│ RequestController                  │
+│ ZendeskController                  │
+│ WebhookController                  │
+│        ↓                           │
+│ RequestService                     │
+│ ZendeskService                     │
+│ WebhookService                     │
+└──────────────┬──────────────┬──────┘
+               │              │
+               ▼              ▼
 ┌─────────────────────┐   ┌──────────────────────────┐
+│ DATA / MODEL LAYER  │   │ EXTERNAL INTEGRATION     │
 │ Render PostgreSQL   │   │ Zendesk Sandbox          │
 │                     │   │                          │
-│ asset_requests      │   │ Brand / Group            │
-│ audit_logs          │   │ Ticket Fields / Form     │
-│ zendesk_connection  │   │ View                     │
-└─────────────────────┘   │ Email Target             │
-                          │ Webhook                  │
-                          │ Triggers                 │
+│ Repository          │   │ Brand / Group            │
+│ DbContext/Session   │   │ Ticket Fields / Form     │
+│ AssetRequest Model  │   │ View                     │
+│ AuditLog Model      │   │ Email Target             │
+│ ZendeskConnection   │   │ Webhook                  │
+└─────────────────────┘   │ Triggers                 │
                           │ Tickets                  │
                           └────────────┬─────────────┘
                                        │ status changed
                                        ▼
-                          POST /api/webhooks/zendesk
+                          WebhookController / Service
                                        │
                                        ▼
                               update PostgreSQL
                                        │
                                        ▼
-                              Track a Request
+                              Track a Request View
 ```
 
 Local development may use SQLite through the same SQLAlchemy models.
 
 ---
 
-# 3. MVC / Layer Mapping
-
-**Model**
-- `AssetRequest`
-- `AuditLog`
-- `ZendeskConnection`
-- SQLAlchemy
-
-**View**
-- React/Vite login
-- asset request form
-- request detail/tracking
-- Zendesk configuration screen
-
-**Controller**
-- FastAPI request routes
-- Zendesk setup routes
-- Zendesk webhook route
-
-**Services**
-- request persistence
-- Zendesk credential validation
-- live configuration discovery
-- dry-run planning
-- configuration apply/verification
-- ticket creation
-- inbound status synchronization
-
-Controllers stay thin. Business logic stays in services.
-
----
-
-# 4. Security
+# 23. Security
 
 ## Portal authentication
 
@@ -156,7 +1302,7 @@ The Zendesk webhook does **not** use the portal Basic Auth credentials. It uses 
 
 ---
 
-# 5. Environment Variables
+# 24. Environment Variables
 
 Backend / Render:
 
@@ -195,7 +1341,7 @@ No server secret belongs in a Vite environment variable.
 
 ---
 
-# 6. Database
+# 25. Database Tables
 
 ## `asset_requests`
 
@@ -225,55 +1371,24 @@ message
 created_at
 ```
 
-Important events:
-
-```text
-REQUEST_CREATED
-ZENDESK_TICKET_CREATED
-ZENDESK_CREATE_FAILED
-ZENDESK_WEBHOOK_RECEIVED
-ZENDESK_STATUS_CHANGED
-```
-
 ## `zendesk_connection`
 
-Stores verified safe metadata and the core Zendesk IDs used for ticket creation:
+Stores verified safe metadata and core Zendesk IDs used for ticket creation.
 
-```text
-id
-subdomain
-api_email
-connected_user_name
-connected_user_email
-connected_user_role
-brand_id
-group_id
-ticket_form_id
-asset_type_field_id
-local_request_id_field_id
-request_source_field_id
-view_id
-connected_at
-configured_at
-verified_at
-```
-
-The Zendesk API token is **not** stored in PostgreSQL.
-
-Workflow resources such as targets, webhooks and triggers are rediscovered by their exact managed names instead of requiring extra database columns.
+Workflow resources such as targets, webhooks and triggers are rediscovered by exact managed names rather than requiring extra database columns.
 
 ---
 
-# 7. Application Pages
+# 26. Application Pages
 
 ## `/request`
 
 Fields:
 
-- requester name
-- requester email
-- asset type
-- business reason
+- requester name;
+- requester email;
+- asset type;
+- business reason.
 
 Allowed asset types:
 
@@ -291,41 +1406,17 @@ After submission, display the local request ID, local status, Zendesk ticket ID 
 
 ## `/requests/:id`
 
-Display:
+Display request details, local status, Zendesk status, sync state and timestamps.
 
-- request ID
-- requester
-- asset type
-- reason
-- local status
-- Zendesk ticket ID
-- Zendesk status
-- sync state
-- last successful sync
-
-The page includes **Refresh status** and also silently reads the local API every 10 seconds while open. Zendesk itself pushes status changes into PostgreSQL through the webhook, so the browser never needs Zendesk credentials.
+The page includes **Refresh status** and silently reads the local API every 10 seconds while open.
 
 ## `/zendesk-setup`
 
-Authenticated administration page that:
-
-1. confirms server-side Zendesk variables exist;
-2. tests the environment credentials;
-3. discovers live Zendesk resources;
-4. displays the complete configuration/workflow plan;
-5. shows CREATE or REUSE for every managed object;
-6. fingerprints the exact plan;
-7. requires explicit approval;
-8. re-reads Zendesk before mutation;
-9. refuses stale approved plans;
-10. creates/reuses resources in dependency order;
-11. verifies every created/reused resource afterward.
+Authenticated administration View that tests server-side Zendesk credentials, discovers live resources, displays the governed plan, captures approval, applies configuration and shows verification results.
 
 ---
 
-# 8. Governed Zendesk Setup
-
-The control pattern intentionally follows the proven CX Experts / AI Site Factory approach: inspect first, stage the intended external changes, require a human gate, then execute and verify.
+# 27. Governed Zendesk Setup
 
 ```text
 Render ENV credentials
@@ -363,7 +1454,7 @@ No configuration or trigger is pushed merely because the user logged in or click
 
 ---
 
-# 9. Zendesk Discovery
+# 28. Zendesk Discovery
 
 Discovery includes:
 
@@ -385,7 +1476,7 @@ Unrelated Zendesk configuration is never deleted.
 
 ---
 
-# 10. Managed Zendesk Resources
+# 29. Managed Zendesk Resources
 
 ## Core ticket configuration
 
@@ -429,7 +1520,7 @@ Receiver
 farhaanhotd1@gmail.com
 ```
 
-The receiver is configurable through `ZENDESK_NOTIFICATION_EMAIL` but defaults to the demo address above.
+The receiver is configurable through `ZENDESK_NOTIFICATION_EMAIL`.
 
 ## Status callback webhook
 
@@ -450,79 +1541,21 @@ Authentication
 Bearer ZENDESK_WEBHOOK_SECRET
 ```
 
-The webhook is attached to ticket activity through a trigger rather than subscribing directly to a predefined ticket-event payload. This lets the trigger send the small payload the FastAPI endpoint expects.
-
 ## Triggers
 
-### `Royal Tyres | Notify Demo Receiver - New Request`
-
-Conditions:
-
 ```text
-current_tags includes royal_tires_asset_portal
-update_type = Create
+Royal Tyres | Notify Demo Receiver - New Request
+Royal Tyres | Notify Demo Receiver - Status Update
+Royal Tyres | Sync Status to Asset Portal
 ```
 
-Action:
-
-```text
-notification_target → Royal Tyres | Demo Notifications
-```
-
-Purpose: demonstrate an email arriving when the portal creates a Zendesk ticket.
-
-### `Royal Tyres | Notify Demo Receiver - Status Update`
-
-Conditions:
-
-```text
-current_tags includes royal_tires_asset_portal
-update_type = Change
-status changed
-```
-
-Action:
-
-```text
-notification_target → Royal Tyres | Demo Notifications
-```
-
-Purpose: demonstrate email notification after an agent changes status.
-
-### `Royal Tyres | Sync Status to Asset Portal`
-
-Conditions:
-
-```text
-current_tags includes royal_tires_asset_portal
-update_type = Change
-status changed
-```
-
-Action:
-
-```text
-notification_webhook → Royal Tyres | Asset Status Sync
-```
-
-Payload template:
-
-```json
-{
-  "event": "status_changed",
-  "ticket_id": "{{ticket.id}}",
-  "external_id": "{{ticket.external_id}}",
-  "status": "{{ticket.status}}"
-}
-```
-
-Purpose: make the Zendesk agent-side status visible in **Track a request**.
+The first two send notification emails. The third sends the status callback to FastAPI.
 
 ---
 
-# 11. Dry-Run Plan
+# 30. Dry-Run Plan
 
-Before any mutation, the configuration page should show the complete plan, including workflow resources:
+Before any mutation, the configuration View should show:
 
 ```text
 Brand         CREATE / REUSE  Royal Tyres
@@ -539,15 +1572,13 @@ Trigger       CREATE / REUSE  Royal Tyres | Notify Demo Receiver - Status Update
 Trigger       CREATE / REUSE  Royal Tyres | Sync Status to Asset Portal
 ```
 
-The email-target row shows the configured demo receiver. The webhook and trigger rows explain their purpose without exposing secrets.
+No mutation occurs during planning.
 
 ---
 
-# 12. Apply Rules and Dependency Order
+# 31. Apply Rules and Dependency Order
 
-The administrator must tick the explicit approval checkbox and submit the exact reviewed plan fingerprint.
-
-Immediately before mutation, FastAPI rebuilds the plan. If the fingerprint changed, return HTTP 409 and require review again.
+The administrator must approve the exact plan fingerprint.
 
 Apply order:
 
@@ -571,59 +1602,28 @@ Validate Trigger definitions
 3 active Triggers
 ```
 
-The trigger definitions are validated through Zendesk before creation.
-
-Unlike the larger AI Site Factory provisioning flow, which kept core triggers inactive for a separate activation stage, this interview implementation creates the three demo triggers **active only after the administrator has already passed the fingerprinted human approval gate**. That preserves the safety principle while eliminating a second manual Admin Center step during the demo.
-
-Every ensure operation re-reads Zendesk and reuses an exact existing object before attempting a create. This makes a retry safe after a partial failure.
+Every ensure operation re-reads Zendesk and reuses an exact existing object before attempting creation.
 
 ---
 
-# 13. Verify After
-
-After Apply, read all managed resources back and show PASS / FAIL:
-
-```text
-Brand
-Group
-Asset Type field
-Local Request ID field
-Request Source field
-Ticket Form
-View
-Email Target
-Webhook
-New Request Email Trigger
-Status Update Email Trigger
-Status Sync Trigger
-```
-
-Only after the complete apply succeeds are the core ticket-creation IDs marked configured locally.
-
----
-
-# 14. Request Creation and Failure Isolation
-
-The local database is the primary system of record.
+# 32. Request Creation and Failure Isolation
 
 ```text
 User submits request
         ↓
-React validation
+React View validation
         ↓
-POST /api/requests
+RequestController
         ↓
-Basic Auth
+Pydantic Schema validation
         ↓
-Pydantic validation
+RequestService
         ↓
-INSERT asset request
-        ↓
-INSERT REQUEST_CREATED audit event
+Repository / Models / DbContext
         ↓
 COMMIT PostgreSQL
         ↓
-Create Zendesk ticket using verified IDs
+ZendeskService creates ticket
         ↓
  success                   failure
     │                          │
@@ -640,46 +1640,7 @@ Zendesk failure must never roll back the employee's saved request.
 
 ---
 
-# 15. Zendesk Ticket Payload
-
-Each ticket includes:
-
-```text
-subject
-internal comment
-requester
-external_id
-brand_id
-group_id
-ticket_form_id
-custom_fields
-tags
-priority
-```
-
-Example linkage:
-
-```text
-Subject: IT Asset Request #27 - Laptop - Mohammed Farhaan Buckas
-External ID: royal-tires-asset-27
-Tags: it_asset_request, royal_tires_asset_portal, local_request_27
-RT | Asset Type = laptop
-RT | Local Request ID = 27
-RT | Request Source = royal_tires_asset_portal
-```
-
-Returned Zendesk values populate:
-
-```text
-zendesk_ticket_id
-zendesk_status
-zendesk_sync_status
-zendesk_last_synced_at
-```
-
----
-
-# 16. Zendesk → Portal Status Sync
+# 33. Zendesk → Portal Status Sync
 
 FastAPI exposes:
 
@@ -687,50 +1648,35 @@ FastAPI exposes:
 POST /api/webhooks/zendesk
 ```
 
-This endpoint deliberately does not require the user's portal Basic Auth credentials. Instead it requires:
+The endpoint uses its own bearer secret rather than portal Basic Auth.
+
+Expected flow:
 
 ```text
-Authorization: Bearer <ZENDESK_WEBHOOK_SECRET>
+Zendesk status change
+    ↓
+Trigger
+    ↓
+Webhook
+    ↓
+WebhookController
+    ↓
+WebhookService
+    ↓
+Repository
+    ↓
+AssetRequest + AuditLog Models
+    ↓
+DbContext / PostgreSQL
+    ↓
+Track a Request View polls local API
 ```
 
-Expected JSON:
-
-```json
-{
-  "event": "status_changed",
-  "ticket_id": 12345,
-  "external_id": "royal-tires-asset-27",
-  "status": "pending"
-}
-```
-
-Processing:
-
-```text
-Validate bearer secret
-        ↓
-Find asset request by zendesk_ticket_id
-        ↓
-If external_id supplied, verify it matches local request identity
-        ↓
-Update local status + zendesk_status
-        ↓
-Set zendesk_sync_status = synced
-        ↓
-Set zendesk_last_synced_at
-        ↓
-Write audit event
-        ↓
-Commit
-```
-
-Duplicate status callbacks are accepted idempotently and logged as received rather than treated as a second status change.
-
-The tracking page reads only FastAPI/PostgreSQL, so no Zendesk credential is exposed to the browser.
+The browser never receives Zendesk credentials.
 
 ---
 
-# 17. API Endpoints
+# 34. API Endpoints
 
 ```text
 GET  /health
@@ -753,125 +1699,218 @@ Swagger/OpenAPI remains available at `/docs`.
 
 ---
 
-# 18. Logging and Auditability
+# 35. Testing Map
 
-Technical logs may contain method, route, status code, local request ID, Zendesk ticket ID and event result.
+Tests are organized by the layer/behavior they protect.
 
-They must not contain credentials or secrets.
+Backend examples:
 
-The durable audit table records meaningful business/integration events independently from application logs.
+```text
+test_health.py      → application startup / health
+test_auth.py        → Core security / Controller protection
+test_security.py    → validation, CORS, security behavior
+test_requests.py    → Controller + Service + Repository + Model flow
+test_zendesk.py     → Zendesk Service / setup orchestration
+test_webhook.py     → Webhook Controller + Service + persistence
+```
+
+Frontend examples:
+
+```text
+*.test.js           → frontend services / validation
+e2e/*.spec.js       → complete View + API interaction in the browser
+```
+
+CI should continue running backend tests, frontend unit tests, Vite build and Playwright browser tests before merge.
 
 ---
 
-# 19. Git / Pull Request History
+# 36. Git / Pull Request History
 
-Actual repository progression:
+Actual progression:
 
 ```text
-PR1  chore/project-scaffold                         ✓
-PR2  feat/core-request-api                          ✓
-PR3  feat/auth-security                             ✓
-PR4  feat/request-ui                                ✓
-PR5  feat/zendesk-integration                       ✓
-PR6  fix/zendesk-field-types                        ✓
-PR7  feat/zendesk-workflow-sync                     CURRENT
+PR1  chore/project-scaffold                         ✓ merged
+PR2  feat/core-request-api                          ✓ merged
+PR3  feat/auth-security                             ✓ merged
+PR4  feat/request-ui                                ✓ merged
+PR5  feat/zendesk-integration                       ✓ merged
+PR6  fix/zendesk-field-types                        ✓ merged
+PR7  feat/zendesk-workflow-sync                     ✓ merged
+PR8  docs/mvc-architecture-map                      current docs-only architecture map
 ```
 
-PR6 corrected the live Zendesk API values used for single-select fields and the View subject column.
-
-PR7 adds:
-
-- demo email target;
-- default notification receiver;
-- Zendesk webhook;
-- new-request email trigger;
-- status-change email trigger;
-- status-change portal-sync trigger;
-- FastAPI webhook authentication and persistence;
-- request tracking refresh/polling;
-- tests for provisioning and callbacks.
-
-Dashboard and manual pull reconciliation follow only if time remains.
+PR8 is intentionally documentation-only. It does not change application behavior. A later refactor may physically extract Layouts, Middleware, Helpers, Repositories and Data/DbContext folders, but that should be a separate no-behavior-change PR protected by the existing tests.
 
 ---
 
-# 20. CI Requirements
+# 37. Future Physical Refactor Target
 
-GitHub Actions runs on PRs and `main`.
-
-Backend:
+The code already follows most of this logic. If readability becomes more important than minimizing files, a future refactor may move toward:
 
 ```text
-install dependencies
-pytest
+backend/app/
+│
+├── controllers/
+│   ├── request_controller.py
+│   ├── zendesk_controller.py
+│   └── webhook_controller.py
+│
+├── models/
+│   ├── asset_request.py
+│   ├── audit_log.py
+│   └── zendesk_connection.py
+│
+├── services/
+│   ├── request_service.py
+│   ├── zendesk_service.py
+│   └── webhook_service.py
+│
+├── repositories/
+│   ├── request_repository.py
+│   ├── audit_repository.py
+│   └── zendesk_repository.py
+│
+├── data/
+│   ├── base.py
+│   ├── db_context.py
+│   └── session.py
+│
+├── schemas/
+│   ├── request_schema.py
+│   ├── zendesk_schema.py
+│   └── webhook_schema.py
+│
+├── middleware/
+│   ├── request_logging.py
+│   └── security_headers.py
+│
+├── helpers/
+│   ├── datetime_helper.py
+│   ├── zendesk_helper.py
+│   └── validation_helper.py
+│
+├── core/
+│   ├── config.py
+│   ├── security.py
+│   └── logging_config.py
+│
+└── main.py
 ```
 
-Frontend:
+Frontend target:
 
 ```text
-npm ci
-unit tests
-Vite build
-Playwright Chromium tests
+frontend/src/
+│
+├── views/
+│   ├── RequestView.jsx
+│   ├── RequestDetailView.jsx
+│   └── ZendeskSetupView.jsx
+│
+├── layouts/
+│   ├── AppLayout.jsx
+│   └── AuthLayout.jsx
+│
+├── components/
+│   ├── shared/
+│   │   ├── Brand.jsx
+│   │   ├── Sidebar.jsx
+│   │   ├── Topbar.jsx
+│   │   ├── Footer.jsx
+│   │   └── AppLink.jsx
+│   │
+│   └── requests/
+│       ├── AssetRequestForm.jsx
+│       ├── StatusBadge.jsx
+│       └── TrackRequestForm.jsx
+│
+├── services/
+│   └── api.js
+│
+├── helpers/
+│   ├── validation.js
+│   └── formatting.js
+│
+├── App.jsx
+└── main.jsx
 ```
 
-Do not merge a failing PR.
-
-Important PR7 tests include:
-
-- webhook rejects missing/wrong bearer token;
-- valid callback updates the local request;
-- duplicate callback is idempotent;
-- external-ID mismatch is rejected;
-- dry-run includes email target, webhook and three triggers;
-- trigger templates use Zendesk Create/Change semantics;
-- webhook provisioning uses the Render callback URL and bearer secret;
-- frontend setup view displays workflow resources and receiver;
-- request tracking remains functional.
+Do not perform this refactor merely for folder aesthetics. Move code only when the resulting responsibility becomes clearer.
 
 ---
 
-# 21. Live Demo Sequence
+# 38. Live Demo Sequence
 
 ```text
 1. Log into Royal Tyres portal.
-2. Open Zendesk Setup.
-3. Test environment connection.
-4. Show live CREATE / REUSE plan.
-5. Point out Brand, Group, Fields, Form, View, Email Target, Webhook and Triggers.
-6. Show the notification receiver.
+2. Explain View → Controller → Service → Repository → Model → DbContext.
+3. Open Zendesk Setup View.
+4. Test environment connection.
+5. Show live CREATE / REUSE plan.
+6. Point out Brand, Group, Fields, Form, View, Email Target, Webhook and Triggers.
 7. Approve the exact fingerprinted plan.
 8. Apply and show PASS verification.
-9. Submit a new Laptop request.
-10. Show local request ID and real Zendesk ticket ID.
-11. Show notification email arriving.
-12. Open the Zendesk ticket.
-13. Change ticket status, for example New → Pending.
-14. Show status-update email arriving.
-15. Return to Track a Request.
-16. Within the polling interval, show local status = Pending and sync timestamp updated.
-17. Explain that the webhook updated PostgreSQL; the browser did not call Zendesk directly.
+9. Submit a new Laptop request from RequestView.
+10. Explain RequestController → RequestService → Repository → AssetRequest Model → PostgreSQL.
+11. Show local request ID and real Zendesk ticket ID.
+12. Show notification email arriving.
+13. Open the Zendesk ticket.
+14. Change ticket status, for example New → Pending.
+15. Show status-update email arriving.
+16. Return to RequestDetailView.
+17. Show local status = Pending and updated sync timestamp.
+18. Explain Zendesk Trigger → WebhookController → WebhookService → Model/DB → View.
 ```
 
-This demonstrates both outbound integration and inbound event synchronization without bloating the architecture.
+---
+
+# 39. Interview Architecture Explanation
+
+A concise explanation:
+
+> I mapped the application around MVC even though the frontend and backend use different frameworks. React contains the Views and reusable Partial/Shared View equivalents. FastAPI routers are the Controllers. Controllers stay thin and call Services for business workflow. Services use a Repository/data layer against SQLAlchemy Models, and `database.py` acts as the DbContext equivalent by owning the engine and scoped sessions. Schemas are the DTO/ViewModel boundary. Middleware handles cross-cutting HTTP behavior. Zendesk is treated as an external integration Service. That gives me one consistent path to reason about the system: View → Controller → Service → Repository → Model → DbContext → Database.
+
+For Zendesk specifically:
+
+> PostgreSQL is the primary system of record, so the request is committed before the Zendesk call. Zendesk credentials stay only in Render. The setup View asks the Zendesk Controller to test and discover the instance. The Zendesk Service creates a fingerprinted CREATE/REUSE plan, and nothing is mutated until the administrator explicitly approves it. Status changes return through the Zendesk webhook into the Webhook Controller/Service and update the same AssetRequest Model, which the Track a Request View then reads.
 
 ---
 
-# 22. Interview Explanation
+# 40. Implementation Rules
 
-> PostgreSQL is the primary system of record, so the employee request is committed before any Zendesk call. Zendesk credentials stay only in the Render backend environment. The setup screen discovers the live Zendesk instance and produces a CREATE/REUSE dry-run plan covering both ticket configuration and workflow resources. The exact plan is fingerprinted and must be explicitly approved. The backend re-reads Zendesk immediately before applying it, validates trigger definitions, creates only missing Royal Tyres resources, and verifies them afterward. Once active, new portal requests create Zendesk tickets and send a demo email. Zendesk status changes trigger an authenticated webhook back to FastAPI, which updates PostgreSQL so the Track a Request page reflects the agent-side status.
-
-Trade-offs:
-
-- Basic Auth is intentionally simple because the assignment explicitly requires it.
-- A separate webhook bearer secret avoids exposing portal credentials to Zendesk.
-- The application stays monolithic because the scope does not justify microservices.
-- The local database remains authoritative when Zendesk is unavailable.
-- Background queues/retries and a manual reconciliation endpoint are sensible production follow-ups but are not required for the live demo.
+1. Treat this file as the source of truth.
+2. Use MVC as the primary mental map.
+3. Views display and collect data; they do not own backend business rules.
+4. Controllers handle HTTP and stay thin.
+5. Services own business workflow and sequencing.
+6. Repositories own database access.
+7. Models represent persisted state.
+8. `database.py` is the current DbContext equivalent.
+9. Schemas are the API DTO/ViewModel boundary.
+10. Middleware owns cross-cutting HTTP behavior.
+11. Helpers must remain small and reusable; business use cases belong in Services.
+12. Core owns application-wide configuration, security and logging.
+13. Shared/Partial View equivalents should be reusable React components/layouts.
+14. Follow SOLID where it improves clarity; do not manufacture abstractions solely to claim compliance.
+15. Comment why, not what.
+16. Never expose or commit secrets.
+17. Never use `dangerouslySetInnerHTML`.
+18. Use SQLAlchemy/parameterized queries rather than interpolated SQL.
+19. Commit the local request before any Zendesk ticket call.
+20. Zendesk failure must not lose the request.
+21. Discovery/dry run must remain read-only.
+22. External configuration requires explicit approved-plan fingerprint.
+23. Re-read Zendesk before mutation and reject stale plans.
+24. Never delete unrelated Zendesk configuration.
+25. Keep Swagger available.
+26. Keep `/health` public.
+27. Run CI before merging behavior-changing PRs.
+28. Prefer code that can be explained under questioning over clever architecture for its own sake.
 
 ---
 
-# 23. Definition of Done
+# 41. Definition of Done
 
 Base application:
 
@@ -885,6 +1924,23 @@ Base application:
 - [x] Swagger
 - [x] CI
 
+Architecture mapping:
+
+- [x] Models identified
+- [x] Views identified
+- [x] Controllers identified
+- [x] Services identified
+- [x] Repository layer identified
+- [x] DbContext equivalent identified
+- [x] Schemas/DTO/ViewModel role defined
+- [x] Shared View / Partial View equivalents defined
+- [x] Middleware responsibility defined
+- [x] Helper responsibility defined
+- [x] Core responsibility defined
+- [x] SOLID mapped to concrete project responsibilities
+- [x] commenting convention defined
+- [x] end-to-end flows mapped file by file
+
 Core Zendesk integration:
 
 - [x] server-side Zendesk credentials
@@ -895,22 +1951,16 @@ Core Zendesk integration:
 - [x] explicit approval gate
 - [x] stale-plan rejection
 - [x] Brand/Group/Fields/Form/View provisioning logic
+- [x] Email Target/Webhook/Trigger provisioning logic
 - [x] ticket-creation logic
 - [x] local persistence before Zendesk
-
-PR7 workflow integration:
-
-- [x] default demo email receiver in configuration
-- [x] Email Target provisioning logic
-- [x] Webhook provisioning logic
-- [x] new-request email Trigger template
-- [x] status-change email Trigger template
-- [x] status-sync Trigger template
-- [x] FastAPI bearer-authenticated webhook endpoint
+- [x] inbound webhook endpoint
 - [x] local status/audit update logic
-- [x] tracking page refresh/polling
-- [ ] PR7 GitHub CI green
-- [ ] `ZENDESK_WEBHOOK_SECRET` configured in Render
+- [x] tracking-page polling
+- [x] PR7 CI green
+
+Live verification still required:
+
 - [ ] refreshed live dry-run reviewed
 - [ ] full Zendesk apply verified
 - [ ] new-request email live-tested
@@ -920,34 +1970,38 @@ Later if time remains:
 
 - [ ] manual Zendesk reconciliation endpoint
 - [ ] operations dashboard
+- [ ] optional no-behavior-change physical architecture refactor
 - [ ] final presentation/demo hardening
 
 ---
 
-# 24. Final Principle
+# 42. Final Principle
 
 ```text
-Validate
-   ↓
-Persist locally
-   ↓
-Discover external state
-   ↓
-Show exact plan
-   ↓
-Human approves
-   ↓
-Validate external rules
-   ↓
-Apply controlled changes
-   ↓
-Verify
-   ↓
-Observe events
-   ↓
-Synchronize safely
-   ↓
-Audit everything important
+VIEW
+  ↓
+CONTROLLER
+  ↓
+SERVICE
+  ↓
+REPOSITORY
+  ↓
+MODEL
+  ↓
+DB CONTEXT
+  ↓
+DATABASE
 ```
 
-The goal is not the largest system. The goal is a **small, demonstrably reliable integration that can be explained under questioning**.
+Around that flow:
+
+```text
+Shared/Partial Views → reusable UI
+Schemas              → validated contracts
+Middleware           → cross-cutting HTTP behavior
+Helpers              → small reusable utilities
+Core                 → configuration/security/logging
+Zendesk              → external integration through Services
+```
+
+The goal is not the largest system. The goal is a **small, understandable and demonstrably reliable application whose architecture can be explained file by file under questioning**.
