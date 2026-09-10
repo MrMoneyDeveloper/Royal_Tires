@@ -11,7 +11,7 @@ function Brand() {
     <div className="brand">
       <span className="brand-mark">R</span>
       <div>
-        ROYAL TYRES<small>IT ASSET PORTAL</small>
+        ROYAL TYRES<small>IT SERVICE DESK</small>
       </div>
     </div>
   );
@@ -34,6 +34,61 @@ export default function App() {
     window.addEventListener('popstate', pop);
     return () => window.removeEventListener('popstate', pop);
   }, []);
+
+  useEffect(() => {
+    const gsap = window.gsap;
+    if (!gsap || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return undefined;
+    }
+
+    const scope = document.querySelector(api ? '.main-content' : '.login-layout');
+    if (!scope) return undefined;
+
+    const context = gsap.context(() => {
+      if (!api) {
+        gsap.from(
+          '.login-story .brand, .heritage-line, .login-story h1, .login-subcopy, .login-caption',
+          {
+            opacity: 0,
+            y: 18,
+            duration: 0.55,
+            stagger: 0.08,
+            ease: 'power2.out',
+            clearProps: 'transform,opacity',
+          },
+        );
+        gsap.from('.login-form', {
+          opacity: 0,
+          x: 24,
+          duration: 0.6,
+          delay: 0.12,
+          ease: 'power2.out',
+          clearProps: 'transform,opacity',
+        });
+        return;
+      }
+
+      const targets = scope.querySelectorAll(
+        '.page-heading, .queue-summary > *, .panel, .settings-card',
+      );
+      if (targets.length) {
+        gsap.fromTo(
+          targets,
+          { opacity: 0, y: 12 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.42,
+            stagger: 0.04,
+            ease: 'power2.out',
+            clearProps: 'transform,opacity',
+          },
+        );
+      }
+    }, scope);
+
+    return () => context.revert();
+  }, [api, path]);
 
   function navigate(to) {
     window.history.pushState({}, '', to);
@@ -80,25 +135,27 @@ export default function App() {
         <section className="login-story">
           <Brand />
           <div>
-            <p className="eyebrow">SUPPORTING THE WAY YOU WORK</p>
+            <p className="heritage-line">Trusted tyre workshop since 1939</p>
+            <p className="eyebrow">INTERNAL IT · SUPPORTING THE WAY YOU WORK</p>
             <h1>
-              The right tools.
+              Keep your work
               <br />
-              Ready for your work.
+              <em>moving.</em>
             </h1>
-            <p>
-              Request equipment, follow its progress, and keep your work moving.
+            <p className="login-subcopy">
+              Request the equipment you need, then follow it from the service desk
+              through to Zendesk without losing sight of the request.
             </p>
           </div>
           <span className="login-caption">
-            Internal IT · Asset requests & tracking
+            Passenger · Commercial · Workshop · Internal IT
           </span>
         </section>
         <section className="login-form-wrap">
           <form className="login-form" onSubmit={signIn}>
             <p className="eyebrow">EMPLOYEE ACCESS</p>
             <h2>Welcome back.</h2>
-            <p className="muted">Sign in to your IT asset portal.</p>
+            <p className="muted">Sign in to the Royal Tyres IT Service Desk.</p>
             <div className="field">
               <label htmlFor="username">Username</label>
               <input
@@ -141,9 +198,15 @@ export default function App() {
   const match = path.match(/^\/requests\/(\d+)\/?$/);
   const isNewRequest = path === '/' || path === '/request' || path === '/request/';
   const isDashboard =
-    path === '/dashboard' || path === '/dashboard/' || path === '/requests' || path === '/requests/';
+    path === '/dashboard' ||
+    path === '/dashboard/' ||
+    path === '/requests' ||
+    path === '/requests/';
   const isSettings =
-    path === '/settings' || path === '/settings/' || path === '/zendesk-setup' || path === '/zendesk-setup/';
+    path === '/settings' ||
+    path === '/settings/' ||
+    path === '/zendesk-setup' ||
+    path === '/zendesk-setup/';
   const breadcrumb = isSettings
     ? 'Settings'
     : isDashboard
@@ -184,7 +247,7 @@ export default function App() {
           </a>
         </nav>
         <div className="sidebar-bottom">
-          <span className="small-dot" /> Built for your workday
+          <span className="small-dot" /> Trusted since 1939 · Internal IT
         </div>
       </aside>
       <div className="workspace">
