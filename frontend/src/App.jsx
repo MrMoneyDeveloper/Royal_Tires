@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createApi } from './services/api.js';
 import AppLink from './components/AppLink.jsx';
 import RequestView from './views/RequestView.jsx';
+import RequestsView from './views/RequestsView.jsx';
 import RequestDetailView from './views/RequestDetailView.jsx';
 import ZendeskSetupView from './views/ZendeskSetupView.jsx';
 
@@ -134,9 +135,17 @@ export default function App() {
     );
 
   const match = path.match(/^\/requests\/(\d+)\/?$/);
-  const isRequest = path === '/' || path === '/request' || path === '/request/';
+  const isNewRequest = path === '/' || path === '/request' || path === '/request/';
+  const isRequestQueue = path === '/requests' || path === '/requests/';
   const isZendeskSetup =
     path === '/zendesk-setup' || path === '/zendesk-setup/';
+  const breadcrumb = isZendeskSetup
+    ? 'Zendesk setup'
+    : isRequestQueue
+      ? 'Request queue'
+      : match
+        ? `Request #${match[1]}`
+        : 'New request';
 
   return (
     <div className="app-layout">
@@ -147,10 +156,18 @@ export default function App() {
           <AppLink
             to="/request"
             navigate={navigate}
-            className={`nav-item ${isRequest ? 'active' : ''}`}
-            aria-current={isRequest ? 'page' : undefined}
+            className={`nav-item ${isNewRequest ? 'active' : ''}`}
+            aria-current={isNewRequest ? 'page' : undefined}
           >
             <span aria-hidden="true">＋</span> New request
+          </AppLink>
+          <AppLink
+            to="/requests"
+            navigate={navigate}
+            className={`nav-item ${isRequestQueue || match ? 'active' : ''}`}
+            aria-current={isRequestQueue ? 'page' : undefined}
+          >
+            <span aria-hidden="true">≡</span> Request queue
           </AppLink>
           <AppLink
             to="/zendesk-setup"
@@ -191,10 +208,7 @@ export default function App() {
       <div className="workspace">
         <header className="topbar">
           <span>
-            IT Service Desk{' '}
-            <span className="breadcrumb">
-              / {isZendeskSetup ? 'Zendesk setup' : 'Asset requests'}
-            </span>
+            IT Service Desk <span className="breadcrumb">/ {breadcrumb}</span>
           </span>
           <div className="account">
             <span className="avatar" aria-hidden="true">
@@ -214,8 +228,10 @@ export default function App() {
           </div>
         </header>
         <main className="main-content">
-          {isRequest ? (
+          {isNewRequest ? (
             <RequestView api={api} navigate={navigate} />
+          ) : isRequestQueue ? (
+            <RequestsView api={api} navigate={navigate} />
           ) : isZendeskSetup ? (
             <ZendeskSetupView api={api} />
           ) : match ? (
@@ -228,8 +244,8 @@ export default function App() {
           ) : (
             <section className="panel">
               <h1>Page not found</h1>
-              <AppLink to="/request" navigate={navigate}>
-                Go to new request
+              <AppLink to="/requests" navigate={navigate}>
+                Go to request queue
               </AppLink>
             </section>
           )}
