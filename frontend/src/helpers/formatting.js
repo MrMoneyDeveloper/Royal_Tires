@@ -12,6 +12,7 @@
  */
 
 export function formatDateTime(value, fallback = '—') {
+  // Return display text to Views/SyncStatePanel; browser locale formatting never changes the stored UTC timestamp.
   return value
     ? new Date(value).toLocaleString(undefined, {
         dateStyle: 'medium',

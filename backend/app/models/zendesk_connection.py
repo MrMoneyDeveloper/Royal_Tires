@@ -32,6 +32,7 @@ class ZendeskConnection(Base):
     connected_user_email: Mapped[str | None] = mapped_column(String(254))
     connected_user_role: Mapped[str | None] = mapped_column(String(40))
 
+    # ZendeskService stores discovered remote IDs here for ticket creation; these are not local foreign keys.
     brand_id: Mapped[int | None] = mapped_column(BigInteger)
     group_id: Mapped[int | None] = mapped_column(BigInteger)
     ticket_form_id: Mapped[int | None] = mapped_column(BigInteger)

@@ -35,6 +35,7 @@ export function validateRequest(values) {
     errors.requester_email = 'Enter a valid email address.';
   if (!ASSET_TYPES.includes(values.asset_type))
     errors.asset_type = 'Choose an asset from the list.';
+  // Share the non-whitespace count with AssetRequestForm.jsx; return errors without mutating the submitted reason.
   if (meaningfulCharacterCount(reason) < 10 || reason.length > 1000)
     errors.reason =
       'Explain your request using at least 10 non-whitespace characters (maximum 1,000 total).';

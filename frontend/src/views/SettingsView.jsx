@@ -95,6 +95,7 @@ export default function SettingsView({ api, username, apiDocsUrl }) {
         </p>
       </section>
 
+      {/* ZendeskSetupView.jsx owns discovery/approval presentation and uses the shared api.js client. */}
       <ZendeskSetupView api={api} embedded />
     </>
   );

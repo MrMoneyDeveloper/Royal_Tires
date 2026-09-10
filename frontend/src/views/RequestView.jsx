@@ -25,6 +25,7 @@ export default function RequestView({ api, navigate }) {
     setSubmitting(true);
     setError('');
     try {
+      // services/api.js POSTs to request_controller.py; the saved request DTO returns with local ID and sync state.
       setCreated(await api.createRequest(values));
     } catch (problem) {
       setError(problem.message);

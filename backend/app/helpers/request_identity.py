@@ -12,6 +12,7 @@ FLOW: WebhookService and ZendeskService -> this module -> String formatting only
 """
 
 def build_external_id(request_id: int) -> str:
+    # ZendeskService sends this deterministic correlation ID; WebhookService rebuilds it, not an encrypted key.
     return f"royal-tires-asset-{request_id}"
 
 
@@ -20,4 +21,5 @@ def build_local_request_tag(request_id: int) -> str:
 
 
 def asset_type_to_zendesk_value(asset_type: str) -> str:
+    # Return the namespaced dropdown value expected by zendesk_service.py's managed ticket fields.
     return "rt_asset_" + asset_type.strip().lower().replace(" ", "_")

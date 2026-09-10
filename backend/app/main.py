@@ -31,12 +31,15 @@ from app.services.request_service import RequestNotFound
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    # core/config.py reads Render environment values into typed Settings; tests may inject them.
     settings = settings or Settings()
+    # data/db_context.py builds the shared Engine from DATABASE_URL, not from route input.
     engine = create_db_engine(settings.database_url)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         configure_logging()
+        # Model mappings registered with data/base.py become SQL tables if missing; this is not a migration.
         Base.metadata.create_all(engine)
         yield
         engine.dispose()
@@ -48,8 +51,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.engine = engine
+    # data/session.py binds the factory once; get_db will yield a Session for each HTTP request.
     app.state.session_factory = create_session_factory(engine)
 
+    # CORS checks browser origins; core/security.py separately authenticates business routes.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
@@ -59,12 +64,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_request_logging(app)
     register_security_headers(app)
 
+    # Hand matching URLs to controllers/*_controller.py after middleware and FastAPI dependencies.
     app.include_router(request_router)
     app.include_router(zendesk_router)
     app.include_router(webhook_router)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
+        # Return schema errors without echoing raw input values into the browser response.
         errors = [
             {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
             for error in exc.errors()

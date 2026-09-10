@@ -46,6 +46,7 @@ export function createApi(
   async function request(path, options = {}) {
     let response;
     try {
+      // Views enter this shared HTTP boundary; send Basic Auth to FastAPI Controllers and return JSON or ApiError.
       response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
         ...options,
         headers: { Authorization: authorization, ...options.headers },
@@ -78,6 +79,7 @@ export function createApi(
     listRequests: (limit = 50, offset = 0) =>
       request(`/api/requests?limit=${limit}&offset=${offset}`),
     getRequest: (id) => request(`/api/requests/${id}`),
+    // RequestView.jsx supplies form values; request_controller.py validates the JSON through request_schema.py.
     createRequest: (data) =>
       request('/api/requests', {
         method: 'POST',
@@ -89,6 +91,7 @@ export function createApi(
       request('/api/zendesk/connect', {
         method: 'POST',
       }),
+    // ZendeskSetupView.jsx sends its reviewed fingerprint; zendesk_controller.py rechecks it before external changes.
     applyZendeskSetup: (planFingerprint) =>
       request('/api/zendesk/apply', {
         method: 'POST',

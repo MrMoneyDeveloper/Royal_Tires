@@ -22,11 +22,13 @@ def add_audit(
     source: str,
     message: str,
 ) -> AuditLog:
+    # models/audit_log.py maps this workflow event to SQL; request_id links it to the parent request.
     event = AuditLog(
         request_id=request_id,
         event_type=event_type,
         source=source,
         message=message,
     )
+    # Stage the event in the caller's Session so the Service can commit it with its related state change.
     db.add(event)
     return event

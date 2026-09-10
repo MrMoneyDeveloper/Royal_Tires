@@ -37,6 +37,7 @@ def add_audit(
     source: str,
     message: str,
 ) -> None:
+    # repositories/audit_repository.py stages an AuditLog in this transaction; this Service chooses the event timing.
     audit_repository.add_audit(db, request_id, event_type, source, message)
     logger.info("event=%s request_id=%s source=%s", event_type, request_id, source)
 
@@ -44,8 +45,11 @@ def add_audit(
 def create_request(
     db: Session, data: AssetRequestCreate, settings: Settings
 ) -> AssetRequest:
+    # Convert the validated DTO from request_schema.py into the persisted Model in models/asset_request.py.
     record = AssetRequest(**data.model_dump())
+    # repositories/request_repository.py stages the Model using our injected Session; it does not commit.
     request_repository.add_request(db, record)
+    # Flush through the Data Session to obtain the database ID for AuditLog; the request is not committed yet.
     db.flush()
     add_audit(db, record.id, "REQUEST_CREATED", "api", "Asset request saved.")
 
@@ -54,11 +58,14 @@ def create_request(
     db.commit()
     db.refresh(record)
 
+    # zendesk_service.py reads saved configuration via zendesk_repository.py before attempting external HTTP.
     if not zendesk_service.is_configured(db):
         return record
 
     try:
+        # zendesk_service.py calls Zendesk only after the local commit; its result carries the external ticket ID.
         ticket = zendesk_service.create_ticket(settings, db, record)
+        # Attach Zendesk's ID to the already-saved Model; the local database primary key stays unchanged.
         record.zendesk_ticket_id = ticket["id"]
         record.zendesk_status = ticket.get("status") or "new"
         record.zendesk_sync_status = "synced"
@@ -81,12 +88,14 @@ def create_request(
             "Zendesk ticket creation failed; local request remains saved.",
         )
 
+    # Commit integration outcome and audit together; Zendesk failure cannot undo the earlier primary commit.
     db.commit()
     db.refresh(record)
     return record
 
 
 def get_request(db: Session, request_id: int) -> AssetRequest:
+    # request_repository.py returns a Model or None; the Service decides that a missing request is an error.
     record = request_repository.get_request(db, request_id)
     if record is None:
         raise RequestNotFound()
@@ -94,4 +103,5 @@ def get_request(db: Session, request_id: int) -> AssetRequest:
 
 
 def list_requests(db: Session, limit: int, offset: int) -> list[AssetRequest]:
+    # request_repository.py owns the ordered ORM query; the Controller receives the resulting Models.
     return request_repository.list_requests(db, limit, offset)

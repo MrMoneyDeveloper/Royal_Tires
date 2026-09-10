@@ -24,13 +24,17 @@ from app.services import request_service
 router = APIRouter(
     prefix="/api/requests",
     tags=["Requests"],
+    # core/security.py checks Basic Auth before any business route body executes.
     dependencies=[Depends(require_user)],
 )
+# data/session.py supplies the shared request-scoped Session; this Controller does not create connections.
 Database = Annotated[Session, Depends(get_db)]
 
 
+# request_schema.py validates incoming JSON before this function; its response schema serializes the returned Model.
 @router.post("", response_model=AssetRequestResponse, status_code=201)
 def create_request(data: AssetRequestCreate, db: Database, request: Request):
+    # services/request_service.py owns persistence/Zendesk sequencing and returns the saved AssetRequest.
     return request_service.create_request(db, data, request.app.state.settings)
 
 
@@ -40,9 +44,11 @@ def list_requests(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
+    # request_service.py delegates the bounded query to request_repository.py and returns Models for serialization.
     return request_service.list_requests(db, limit, offset)
 
 
 @router.get("/{request_id}", response_model=AssetRequestResponse)
 def get_request(request_id: int, db: Database):
+    # request_service.py returns the local Model or raises RequestNotFound, mapped to HTTP 404 in main.py.
     return request_service.get_request(db, request_id)

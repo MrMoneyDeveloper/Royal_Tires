@@ -30,6 +30,7 @@ export default function RequestDetailView({ id, api, navigate }) {
       else setLoading(true);
       setError('');
       try {
+        // services/api.js reads request_controller.py's persisted status; manual refresh does not reconcile with Zendesk.
         setRecord(await api.getRequest(id));
       } catch (problem) {
         setError(
@@ -49,6 +50,7 @@ export default function RequestDetailView({ id, api, navigate }) {
     let active = true;
     setLoading(true);
     setError('');
+    // Initial load follows services/api.js -> request_controller.py; later polling reads the same local DTO.
     api
       .getRequest(id)
       .then((value) => {

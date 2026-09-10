@@ -39,12 +39,14 @@ export default function AssetRequestForm({ onSubmit, submitting, error }) {
   function submit(event) {
     event.preventDefault();
     if (submitting) return;
+    // helpers/validation.js returns field errors for usability; request_schema.py independently validates server input.
     const nextErrors = validateRequest(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       form.current.elements[Object.keys(nextErrors)[0]].focus();
       return;
     }
+    // Hand valid trimmed data back to RequestView.jsx; that View calls api.js, so this component owns no HTTP.
     onSubmit(
       Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value.trim()]),

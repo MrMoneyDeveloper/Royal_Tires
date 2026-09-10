@@ -18,10 +18,12 @@ from app.models.asset_request import AssetRequest
 
 
 def add_request(db: Session, record: AssetRequest) -> None:
+    # Stage models/asset_request.py in the supplied Session; request_service.py owns flush/commit timing.
     db.add(record)
 
 
 def get_request(db: Session, request_id: int) -> AssetRequest | None:
+    # SQLAlchemy resolves the Model by primary key and returns it or None; caller decides missing-record behavior.
     return db.get(AssetRequest, request_id)
 
 
@@ -30,12 +32,14 @@ def list_requests(db: Session, limit: int, offset: int) -> list[AssetRequest]:
         AssetRequest.created_at.desc(),
         AssetRequest.id.desc(),
     )
+    # Execute through data/session.py's injected Session; return Models rather than HTTP response objects.
     return list(db.scalars(statement.limit(limit).offset(offset)))
 
 
 def get_by_zendesk_ticket_id(
     db: Session, zendesk_ticket_id: int
 ) -> AssetRequest | None:
+    # Bind the external ticket ID as SQL data; webhook_service.py uses the matching Model for correlation.
     statement = select(AssetRequest).where(
         AssetRequest.zendesk_ticket_id == zendesk_ticket_id
     )

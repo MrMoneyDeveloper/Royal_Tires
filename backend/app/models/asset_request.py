@@ -23,12 +23,14 @@ from app.data.base import Base, UTCDateTime, utc_now
 class AssetRequest(Base):
     __tablename__ = "asset_requests"
 
+    # SQLAlchemy maps these attributes to asset_requests columns; the database generates this local primary key.
     id: Mapped[int] = mapped_column(primary_key=True)
     requester_name: Mapped[str] = mapped_column(String(100))
     requester_email: Mapped[str] = mapped_column(String(254))
     asset_type: Mapped[str] = mapped_column(String(30))
     reason: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="new")
+    # ZendeskService supplies this external ID after creation; it is not a foreign key to a local table.
     zendesk_ticket_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     zendesk_status: Mapped[str | None] = mapped_column(String(20))
     zendesk_sync_status: Mapped[str] = mapped_column(String(20), default="sync_pending")

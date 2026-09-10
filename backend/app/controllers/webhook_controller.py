@@ -41,6 +41,7 @@ def _require_zendesk_bearer(request: Request, authorization: str | None) -> None
         raise HTTPException(status_code=401, detail="Invalid webhook authentication.")
 
 
+# Zendesk calls this route; schemas/webhook_schema.py validates and normalizes JSON before the route body.
 @router.post("/zendesk", response_model=ZendeskWebhookResponse)
 def zendesk_status_webhook(
     payload: ZendeskStatusWebhook,
@@ -48,8 +49,10 @@ def zendesk_status_webhook(
     request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ):
+    # Authenticate the callback with its separate Settings bearer secret before handing it to the Service.
     _require_zendesk_bearer(request, authorization)
     try:
+        # services/webhook_service.py correlates IDs and commits status/audit; it returns the Model and change flag.
         record, changed = webhook_service.apply_zendesk_status(db, payload)
     except webhook_service.WebhookRequestNotFound as exc:
         raise HTTPException(

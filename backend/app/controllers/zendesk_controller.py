@@ -65,6 +65,7 @@ def _with_plan_fingerprint(status: dict) -> dict:
 def get_setup(db: Database, request: Request):
     try:
         settings = request.app.state.settings
+        # services/zendesk_service.py discovers remote state and returns a dry-run, without applying changes.
         status = zendesk_service.get_setup_status(db, settings)
         status = _with_legacy_guard_plan(status, settings)
         return _with_plan_fingerprint(status)
@@ -77,6 +78,7 @@ def connect(db: Database, request: Request):
     """Test Zendesk credentials already configured in the backend environment."""
     try:
         settings = request.app.state.settings
+        # zendesk_service.py tests server-held credentials and saves safe local metadata; remote setup stays unchanged.
         status = zendesk_service.connect(db, settings)
         status = _with_legacy_guard_plan(status, settings)
         return _with_plan_fingerprint(status)
@@ -84,6 +86,7 @@ def connect(db: Database, request: Request):
         raise _translate(error) from error
 
 
+# schemas/zendesk_schema.py validates confirmation/fingerprint shape; this Controller enforces reviewed-plan equality.
 @router.post("/apply", response_model=ZendeskSetupStatus)
 def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
     if data.confirm is not True:
@@ -107,6 +110,7 @@ def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
                 ),
             )
 
+        # Only after the fingerprint matches, zendesk_service.py applies dependencies and returns read-back results.
         status = zendesk_service.apply_setup(db, settings)
         if settings.zendesk_legacy_trigger_guard_enabled:
             brand_id = (status.get("ids") or {}).get("brand_id")
@@ -115,6 +119,7 @@ def apply_setup(data: ZendeskApplyRequest, db: Database, request: Request):
                     "Royal Tyres brand ID is unavailable for the legacy trigger safeguard.",
                     502,
                 )
+            # services/legacy_trigger_guard.py applies only allowlisted brand exclusions and checks preservation.
             guard_verification = legacy_trigger_guard.apply_exclusions(settings, brand_id)
             status = dict(status)
             status["verification"] = [

@@ -20,7 +20,9 @@ def register_security_headers(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        # Let the next middleware/Controller produce the response before applying the shared header policy.
         response = await call_next(request)
+        # Returning toward the browser: prevent MIME guessing; no-store below discourages caching API data.
         response.headers["X-Content-Type-Options"] = "nosniff"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"

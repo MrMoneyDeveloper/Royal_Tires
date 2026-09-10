@@ -23,6 +23,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Link this audit row to models/asset_request.py; one request can have many persisted workflow events.
     request_id: Mapped[int] = mapped_column(ForeignKey("asset_requests.id"), index=True)
     event_type: Mapped[str] = mapped_column(String(50))
     source: Mapped[str] = mapped_column(String(20))

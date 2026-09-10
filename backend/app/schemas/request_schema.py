@@ -28,6 +28,7 @@ AssetType = Literal[
 ]
 
 
+# FastAPI constructs this input DTO before request_controller.py calls the Service; it is not an ORM table.
 class AssetRequestCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
@@ -49,6 +50,7 @@ class AssetRequestCreate(BaseModel):
 
 
 class AssetRequestResponse(BaseModel):
+    # Read the AssetRequest Model returned by the Service into the Controller's public response fields.
     model_config = ConfigDict(from_attributes=True)
 
     id: int
